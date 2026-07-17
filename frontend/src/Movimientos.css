@@ -1,0 +1,194 @@
+/* ===== Movimientos Diarios ===== */
+
+/* Barra de fecha + filtros */
+.dia-barra {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.dia-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.dia-input {
+  width: auto;
+}
+.filtros-activos {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.filtros-punto {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+/* Panel de filtros avanzados */
+.filtros-card {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.filtro-campo .form-label {
+  margin-top: 0;
+}
+.montos-row {
+  display: flex;
+  gap: 8px;
+}
+.filtro-limpiar {
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Montos de gastos: rojo estilo contable */
+.monto-gasto {
+  color: #c00000;
+  font-weight: 600;
+}
+.num {
+  text-align: right;
+  white-space: nowrap;
+}
+.tabla-movs {
+  min-width: 900px; /* muchas columnas: en pantallas chicas se desliza */
+}
+
+/* Badges de Venta / Gasto */
+.badge-venta,
+.badge-gasto {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.badge-venta {
+  background: #e8f7ee;
+  color: #15803d;
+}
+.badge-gasto {
+  background: #fdecec;
+  color: #c00000;
+}
+
+/* Chip de día cerrado + botón de terminar */
+.chip-cerrado {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  background: #fdecec;
+  color: #c00000;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.btn-terminar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #15803d;
+  color: var(--white);
+  border: none;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-terminar:hover {
+  background: #116632;
+}
+
+/* Resumen bajo la tabla */
+.resumen-dia {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding: 13px 16px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.resumen-dia b {
+  color: var(--text);
+}
+
+/* Modal de movimiento */
+.modal-movimiento {
+  max-width: 520px;
+}
+.modal-fecha {
+  float: right;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--secondary);
+  padding: 4px 10px;
+  border-radius: 7px;
+}
+.fila-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.fila-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+/* Totales en vivo dentro del modal */
+.totales-vivo {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--secondary);
+  border-radius: 9px;
+  font-size: 14px;
+  color: var(--tertiary);
+}
+.totales-vivo.es-gasto {
+  background: #fdecec;
+}
+.totales-vivo.es-gasto b {
+  color: #c00000;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .fila-3 {
+    grid-template-columns: 1fr;
+  }
+  .fila-2 {
+    grid-template-columns: 1fr;
+  }
+  .dia-barra {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .resumen-dia {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

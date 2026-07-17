@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
+    "ventas",
 ]
 
 # DRF: por defecto, autenticar con token. Así cada endpoint futuro

@@ -25,11 +25,11 @@
 }
 
 /* El "velo" blanco semitransparente = la opacidad que pediste.
-   Sube o baja el 0.55 para que la foto se vea más o menos. */
+   Sube o baja el 0.7 para que la foto se vea más o menos. */
 .login-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(2px);
 }
 
@@ -116,7 +116,9 @@
   border: 1px solid var(--border);
   border-radius: 9px;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 .field-input:focus {
   border-color: var(--navy);
@@ -152,6 +154,12 @@
   cursor: pointer;
 }
 
+.remember input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--navy);
+}
+
 /* ===== Botón ===== */
 .login-btn {
   width: 100%;
@@ -164,6 +172,11 @@
   border-radius: 9px;
   cursor: pointer;
   transition: background 0.15s;
+  /* flex + gap: el espacio entre icono y texto queda bien sin importar el orden */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .login-btn:hover:not(:disabled) {
   background: var(--navy-dark);
@@ -182,47 +195,4 @@
   padding: 10px 12px;
   font-size: 13px;
   margin-bottom: 16px;
-}
-
-/* ===== Enlaces / pie ===== */
-.link {
-  color: var(--navy);
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-}
-.link:hover { text-decoration: underline; }
-
-.card-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 22px 0 16px;
-}
-.card-footer-text {
-  text-align: center;
-  font-size: 13px;
-  color: var(--muted);
-  margin: 0;
-}
-
-.page-footer {
-  margin-top: 26px;
-  text-align: center;
-}
-.footer-links {
-  display: flex;
-  gap: 18px;
-  justify-content: center;
-  margin-bottom: 8px;
-}
-.link-muted {
-  color: var(--muted);
-  font-size: 12px;
-  text-decoration: none;
-}
-.link-muted:hover { color: var(--navy); }
-.copyright {
-  color: var(--muted);
-  font-size: 12px;
-  margin: 0;
 }

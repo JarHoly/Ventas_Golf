@@ -1,4 +1,11 @@
 import { useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faGolfBallTee,
+  faEye,
+  faEyeSlash,
+  faRightToBracket,
+} from "@fortawesome/free-solid-svg-icons";
 import { login } from "./api";
 import "./Login.css";
 
@@ -32,7 +39,7 @@ export default function Login({ onLogin }) {
   // La foto de fondo se lee de frontend/public/golf-bg.jpg.
   // Si el archivo no existe, queda solo el degradado del CSS (no rompe nada).
   const bgStyle = {
-    backgroundImage: `url(${process.env.PUBLIC_URL}/golf-bg.jpg), linear-gradient(#cdd8e6, #eef2f7)`,
+    backgroundImage: `url(${process.env.PUBLIC_URL}/golf-bg.png), linear-gradient(#cdd8e6, #eef2f7)`,
   };
 
   return (
@@ -40,35 +47,33 @@ export default function Login({ onLogin }) {
       <div className="login-overlay" />
 
       <div className="login-content">
-        {/* Marca */}
-        <div className="brand">
-          <div className="brand-icon">⛳</div>
-          <h1 className="brand-name">Ecuestas</h1>
-          <p className="brand-sub">Management Suite v2.4</p>
-        </div>
-
         {/* Tarjeta */}
         <form className="login-card" onSubmit={handleSubmit}>
-          <h2 className="card-title">Welcome Back</h2>
-          <p className="card-sub">Access your golf sales dashboard</p>
+          {/* Marca */}
+          <div className="brand">
+            <div className="brand-icon">
+              <FontAwesomeIcon icon={faGolfBallTee} />
+            </div>
+            <h1 className="brand-name">E-Cuestas </h1>
+            <p className="brand-sub">Sistema de Ventas v1.0</p>
+          </div>
+          <h2 className="card-title">¡Bienvenido de vuelta!</h2>
+          <p className="card-sub">Accede a tu panel de control de ventas</p>
 
           {error && <div className="login-error">{error}</div>}
 
-          <label className="field-label">Email / Username</label>
+          <label className="field-label">Usuario</label>
           <input
             className="field-input"
             type="text"
-            placeholder="john.doe@ecuestas.com"
+            placeholder="John Doe"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoFocus
           />
 
           <div className="field-label-row">
-            <label className="field-label">Password</label>
-            <a href="#forgot" className="link">
-              Forgot Password?
-            </a>
+            <label className="field-label">Contraseña</label>
           </div>
           <div className="password-wrap">
             <input
@@ -84,7 +89,7 @@ export default function Login({ onLogin }) {
               onClick={() => setShowPassword((v) => !v)}
               aria-label="Mostrar u ocultar contraseña"
             >
-              {showPassword ? "🙈" : "👁"}
+              <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
             </button>
           </div>
 
@@ -94,39 +99,19 @@ export default function Login({ onLogin }) {
               checked={remember}
               onChange={(e) => setRemember(e.target.checked)}
             />
-            Keep me logged in
+            Recuérdame
           </label>
 
           <button className="login-btn" type="submit" disabled={loading}>
-            {loading ? "Ingresando..." : "Log In →"}
+            {loading ? (
+              "Ingresando..."
+            ) : (
+              <>
+                <FontAwesomeIcon icon={faRightToBracket} /> Iniciar Sesión
+              </>
+            )}
           </button>
-
-          <div className="card-divider" />
-          <p className="card-footer-text">
-            Don't have an account?{" "}
-            <a href="#contact" className="link">
-              Contact Administrator
-            </a>
-          </p>
         </form>
-
-        {/* Pie de página */}
-        <div className="page-footer">
-          <div className="footer-links">
-            <a href="#privacy" className="link-muted">
-              Privacy Policy
-            </a>
-            <a href="#terms" className="link-muted">
-              Terms of Service
-            </a>
-            <a href="#status" className="link-muted">
-              System Status
-            </a>
-          </div>
-          <p className="copyright">
-            © 2026 Ecuestas Golf Solutions. All rights reserved.
-          </p>
-        </div>
       </div>
     </div>
   );

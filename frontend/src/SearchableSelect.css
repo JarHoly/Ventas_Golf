@@ -1,0 +1,70 @@
+/* Select con búsqueda (combobox) */
+.combobox {
+  position: relative;
+}
+.combobox-caja {
+  position: relative;
+}
+.combobox-caja .form-input {
+  padding-right: 34px; /* espacio para la flecha o la X */
+}
+.combobox-flecha,
+.combobox-limpiar {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.combobox-limpiar {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+.combobox-limpiar:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.combobox-lista {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+  z-index: 150; /* por encima del modal */
+}
+.combobox-opcion {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 13px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+.combobox-opcion:hover {
+  background: var(--secondary);
+  color: var(--primary);
+}
+.combobox-opcion.elegida {
+  background: var(--secondary);
+  color: var(--primary);
+  font-weight: 600;
+}
+.combobox-vacio {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}

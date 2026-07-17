@@ -1,13 +1,26 @@
+/* ===== Design system (paleta de Ecuestas) =====
+   Estas variables están disponibles en TODA la app: usalas como var(--primary), etc. */
+:root {
+  --primary: #0056b3;
+  --secondary: #e1f0ff;
+  --tertiary: #003d80;
+  --neutral: #f8fafc;
+
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --white: #ffffff;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    "Helvetica Neue", sans-serif;
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }
