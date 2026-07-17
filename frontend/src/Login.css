@@ -1,0 +1,228 @@
+/* ===== Colores de la marca ===== */
+:root {
+  --navy: #1b3a6b;
+  --navy-dark: #142c52;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+}
+
+/* ===== Fondo: la foto del campo de golf a pantalla completa ===== */
+.login-page {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: auto;
+
+  /* Tu imagen de fondo. Guardá la foto del campo como:
+     frontend/src/assets/golf-bg.jpg
+     (si todavía no está, se ve el degradado azul de abajo) */
+  background: linear-gradient(#cdd8e6, #eef2f7),
+    url("./assets/golf-bg.jpg") center/cover no-repeat fixed;
+}
+
+/* El "velo" blanco semitransparente = la opacidad que pediste.
+   Sube o baja el 0.55 para que la foto se vea más o menos. */
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+/* Todo el contenido va por encima del velo */
+.login-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ===== Marca ===== */
+.brand {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.brand-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 12px;
+  border-radius: 12px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.brand-name {
+  color: var(--navy);
+  font-size: 30px;
+  font-weight: 800;
+  margin: 0;
+}
+.brand-sub {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 4px 0 0;
+}
+
+/* ===== Tarjeta ===== */
+.login-card {
+  width: 100%;
+  background: #fff;
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 20px 45px rgba(20, 44, 82, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+.card-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+.card-sub {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 4px 0 20px;
+}
+
+/* ===== Campos ===== */
+.field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.field-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 16px;
+}
+.field-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 13px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field-input:focus {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px rgba(27, 58, 107, 0.12);
+}
+
+.password-wrap {
+  position: relative;
+}
+.password-wrap .field-input {
+  padding-right: 42px;
+}
+.eye-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  line-height: 1;
+}
+
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 16px 0 20px;
+  cursor: pointer;
+}
+
+/* ===== Botón ===== */
+.login-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.login-btn:hover:not(:disabled) {
+  background: var(--navy-dark);
+}
+.login-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* ===== Error ===== */
+.login-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* ===== Enlaces / pie ===== */
+.link {
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.link:hover { text-decoration: underline; }
+
+.card-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 22px 0 16px;
+}
+.card-footer-text {
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.page-footer {
+  margin-top: 26px;
+  text-align: center;
+}
+.footer-links {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.link-muted {
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+.link-muted:hover { color: var(--navy); }
+.copyright {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
