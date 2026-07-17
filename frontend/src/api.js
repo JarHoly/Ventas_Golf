@@ -1,4 +1,5 @@
-API_URL = process.env.API_URL || "https://staging.golf.corvana.net/api";
+export const API_URL =
+  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
 
 // Manda usuario + clave al backend. Si son correctos devuelve {token, username, nombre}.
 // Si no, lanza un error con el mensaje que vino del servidor.

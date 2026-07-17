@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["node_modules/react-scripts/bin/react-scripts.js", "start"],
+      "cwd": "frontend",
+      "port": 3000
+    }
+  ]
+}

@@ -29,8 +29,14 @@ export default function Login({ onLogin }) {
     }
   }
 
+  // La foto de fondo se lee de frontend/public/golf-bg.jpg.
+  // Si el archivo no existe, queda solo el degradado del CSS (no rompe nada).
+  const bgStyle = {
+    backgroundImage: `url(${process.env.PUBLIC_URL}/golf-bg.jpg), linear-gradient(#cdd8e6, #eef2f7)`,
+  };
+
   return (
-    <div className="login-page">
+    <div className="login-page" style={bgStyle}>
       <div className="login-overlay" />
 
       <div className="login-content">

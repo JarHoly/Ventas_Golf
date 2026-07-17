@@ -17,11 +17,11 @@
   padding: 24px;
   overflow: auto;
 
-  /* Tu imagen de fondo. Guardá la foto del campo como:
-     frontend/src/assets/golf-bg.jpg
-     (si todavía no está, se ve el degradado azul de abajo) */
-  background: linear-gradient(#cdd8e6, #eef2f7),
-    url("./assets/golf-bg.jpg") center/cover no-repeat fixed;
+  /* Color de respaldo si aún no hay foto. La imagen real se pone
+     por estilo en línea en Login.js (lee frontend/public/golf-bg.jpg). */
+  background: linear-gradient(#cdd8e6, #eef2f7);
+  background-size: cover;
+  background-position: center;
 }
 
 /* El "velo" blanco semitransparente = la opacidad que pediste.
