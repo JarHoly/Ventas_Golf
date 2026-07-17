@@ -1,5 +1,5 @@
 export const API_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
+  process.env.REACT_APP_API_URL || "https://golf.corvana.net/";
 
 // Manda usuario + clave al backend. Si son correctos devuelve {token, username, nombre}.
 // Si no, lanza un error con el mensaje que vino del servidor.
@@ -41,7 +41,10 @@ async function procesar(res) {
     const msg =
       data.detail ||
       Object.entries(data)
-        .map(([campo, errs]) => `${campo}: ${Array.isArray(errs) ? errs.join(", ") : errs}`)
+        .map(
+          ([campo, errs]) =>
+            `${campo}: ${Array.isArray(errs) ? errs.join(", ") : errs}`,
+        )
         .join(" · ") ||
       "Ocurrió un error.";
     throw new Error(msg);
@@ -59,7 +62,7 @@ export async function apiPost(path, body) {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify(body),
-    })
+    }),
   );
 }
 
@@ -69,12 +72,17 @@ export async function apiPut(path, body) {
       method: "PUT",
       headers: authHeaders(),
       body: JSON.stringify(body),
-    })
+    }),
   );
 }
 
 export async function apiDelete(path) {
-  return procesar(await fetch(`${API_URL}${path}`, { method: "DELETE", headers: authHeaders() }));
+  return procesar(
+    await fetch(`${API_URL}${path}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    }),
+  );
 }
 
 // Consulta el nombre en el padrón a partir de la cédula.
