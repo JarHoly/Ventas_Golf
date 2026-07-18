@@ -1,5 +1,9 @@
+// La URL del backend viene de los archivos .env (sin tocar código):
+//   npm start      -> lee frontend/.env.development -> http://localhost:8000/api
+//   npm run build  -> lee frontend/.env.production  -> https://golf.corvana.net/api
+// El valor de respaldo (localhost) solo aplica si faltaran esos archivos.
 export const API_URL =
-  process.env.REACT_APP_API_URL || "https://golf.corvana.net/";
+  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
 
 // Manda usuario + clave al backend. Si son correctos devuelve {token, username, nombre}.
 // Si no, lanza un error con el mensaje que vino del servidor.
