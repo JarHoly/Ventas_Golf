@@ -357,8 +357,9 @@ def pdf_resumen_dia(request, fecha):
         ("ALIGN", (6, 1), (-1, -1), "RIGHT"),
         ("ALIGN", (0, 1), (0, -1), "CENTER"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+        # Filas bien compactas: el máximo de movimientos por página
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0.5),
         ("BACKGROUND", (0, fila_total), (-1, fila_total), NAVY),
         ("TEXTCOLOR", (0, fila_total), (-1, fila_total), colors.white),
         ("FONTNAME", (0, fila_total), (-1, fila_total), "Helvetica-Bold"),
@@ -371,21 +372,24 @@ def pdf_resumen_dia(request, fecha):
     elementos.append(Spacer(1, 4 * mm))
 
     # ============ DISTRIBUCIÓN + OBSERVACIONES ============
+    # El % es la proporción del MOVIMIENTO total (valores absolutos), igual que
+    # las porciones de la dona: así leyenda y gráfico siempre coinciden y suman 100%.
+    movido_total = sum(abs(v) for v in neto_por_metodo.values())
     filas_leyenda = []
     for m in METODOS:
         v = neto_por_metodo[m]
-        pct = (float(v) / float(neto_total) * 100) if neto_total else 0
+        pct = (abs(float(v)) / float(movido_total) * 100) if movido_total else 0
         cuadro = Drawing(8, 8)
         cuadro.add(Rect(0, 0, 8, 8, fillColor=COLOR_METODO[m], strokeColor=None))
         filas_leyenda.append([
             cuadro, _p(m, 8),
             _p(_fmt(v), 8, ROJO if v < 0 else colors.black, alin=2),
-            _p(f"{pct:.2f}%", 8, ROJO if pct < 0 else NAVY, negrita=True, alin=2),
+            _p(f"{pct:.2f}%", 8, ROJO if v < 0 else NAVY, negrita=True, alin=2),
         ])
     filas_leyenda.append([
         "", _p("TOTAL", 8, negrita=True),
         _p(_fmt(neto_total, neto_total < 0), 8, negrita=True, alin=2),
-        _p("100.00%", 8, NAVY, negrita=True, alin=2),
+        _p("100.00%" if movido_total else "0.00%", 8, NAVY, negrita=True, alin=2),
     ])
     leyenda = Table(filas_leyenda, colWidths=[14, 70, 62, 48])
     leyenda.setStyle(TableStyle([
@@ -410,8 +414,10 @@ def pdf_resumen_dia(request, fecha):
     ]))
 
     ancho_obs = W * 0.52 - 6
+    # Alturas calculadas para que esta caja mida IGUAL que la de distribución
+    # (título ~21 + fila de la dona ~107 = ~128)
     filas_obs = [[_p("OBSERVACIONES", 8.5, NAVY, negrita=True)]] + [[""] for _ in range(5)]
-    caja_obs = Table(filas_obs, colWidths=[ancho_obs], rowHeights=[16] + [15] * 5)
+    caja_obs = Table(filas_obs, colWidths=[ancho_obs], rowHeights=[18] + [22] * 5)
     estilo_obs = [
         ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
         ("ROUNDEDCORNERS", [5, 5, 5, 5]),
