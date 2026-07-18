@@ -25,7 +25,14 @@ SECRET_KEY = 'django-insecure-laa6@52i6hj!r5qm#fd8eg%f$m-itgy@*r&4u=w_c_@154b4is
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# Hosts desde los que Django acepta peticiones. Si el dominio no está aquí,
+# Django responde 400 (DisallowedHost) por seguridad.
+ALLOWED_HOSTS = [
+    "golf.corvana.net",
+    "staging.golf.corvana.net",
+    "localhost",
+    "127.0.0.1",
+]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
