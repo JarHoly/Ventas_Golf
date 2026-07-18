@@ -5,7 +5,7 @@ gráfico de evolución por método, tabla de detalle, dona de distribución,
 observaciones y pie de página con numeración.
 """
 import io
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from django.http import HttpResponse
@@ -20,7 +20,7 @@ from reportlab.pdfgen import canvas as pdfcanvas
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.graphics.shapes import Drawing, Rect, Circle, String
-from reportlab.graphics.charts.lineplots import LinePlot
+from reportlab.graphics.charts.linecharts import HorizontalLineChart
 from reportlab.graphics.charts.piecharts import Pie
 
 from reportlab.pdfbase import pdfmetrics
@@ -141,8 +141,12 @@ def _tarjeta(ancho, etiqueta, valor, sub, color, glifo):
     return tarjeta
 
 
-def _grafico_evolucion(ancho, alto, movimientos):
-    """Línea acumulada del total por método a lo largo de los movimientos del día."""
+DIAS_GRAFICO = 7  # el día del reporte + los 6 anteriores
+
+
+def _grafico_evolucion(ancho, alto, fecha_reporte):
+    """Comparación de los últimos días: una línea por método de pago,
+    con el neto (ventas − gastos) de cada día."""
     d = Drawing(ancho, alto)
 
     # Leyenda arriba
@@ -152,29 +156,28 @@ def _grafico_evolucion(ancho, alto, movimientos):
         d.add(String(x + 10, alto - 9.5, metodo, fontName=F_NORMAL, fontSize=5.5, fillColor=GRIS))
         x += 10 + 5.5 * 0.55 * len(metodo) + 12
 
-    # Series: acumulado por método (ventas suman, gastos restan). Todas parten de (0, 0).
-    acumulado = {m: 0 for m in METODOS}
-    series = {m: [(0, 0)] for m in METODOS}
-    for i, mov in enumerate(movimientos, start=1):
+    # Neto por método de cada uno de los últimos días (una sola consulta).
+    dias = [fecha_reporte - timedelta(days=i) for i in range(DIAS_GRAFICO - 1, -1, -1)]
+    neto = {m: {dia: 0.0 for dia in dias} for m in METODOS}
+    consulta = Movimiento.objects.filter(fecha__range=(dias[0], dias[-1]))
+    for mov in consulta:
         monto = float(mov.total) if mov.tipo == "Venta" else -float(mov.total)
-        acumulado[mov.metodo] += monto
-        for m in METODOS:
-            series[m].append((i, acumulado[m]))
+        neto[mov.metodo][mov.fecha] += monto
 
-    lp = LinePlot()
-    lp.x, lp.y = 26, 12
-    lp.width, lp.height = ancho - 38, alto - 32
-    lp.data = [series[m] for m in METODOS]
+    lc = HorizontalLineChart()
+    lc.x, lc.y = 26, 14
+    lc.width, lc.height = ancho - 38, alto - 34
+    lc.data = [tuple(neto[m][dia] for dia in dias) for m in METODOS]
     for i, m in enumerate(METODOS):
-        lp.lines[i].strokeColor = COLOR_METODO[m]
-        lp.lines[i].strokeWidth = 1.4
-    lp.xValueAxis.valueMin = 0
-    lp.xValueAxis.valueMax = max(1, len(movimientos))
-    lp.xValueAxis.labels.fontSize = 5
-    lp.xValueAxis.labels.fontName = F_NORMAL
-    lp.yValueAxis.labels.fontSize = 5
-    lp.yValueAxis.labels.fontName = F_NORMAL
-    d.add(lp)
+        lc.lines[i].strokeColor = COLOR_METODO[m]
+        lc.lines[i].strokeWidth = 1.4
+    # Eje X con las fechas (dd/mm)
+    lc.categoryAxis.categoryNames = [dia.strftime("%d/%m") for dia in dias]
+    lc.categoryAxis.labels.fontSize = 5
+    lc.categoryAxis.labels.fontName = F_NORMAL
+    lc.valueAxis.labels.fontSize = 5
+    lc.valueAxis.labels.fontName = F_NORMAL
+    d.add(lc)
     return d
 
 
@@ -308,8 +311,8 @@ def pdf_resumen_dia(request, fecha):
 
     ancho_grafico = W * 0.38 - 6
     caja_grafico = Table(
-        [[_p("EVOLUCIÓN DEL TOTAL POR MÉTODO DE PAGO (USD)", 7.5, NAVY, negrita=True)],
-         [_grafico_evolucion(ancho_grafico - 12, 78, movimientos)]],
+        [[_p("EVOLUCIÓN POR MÉTODO DE PAGO — ÚLTIMOS 7 DÍAS (USD)", 7.5, NAVY, negrita=True)],
+         [_grafico_evolucion(ancho_grafico - 12, 78, f)]],
         colWidths=[ancho_grafico],
     )
     caja_grafico.setStyle(TableStyle([
@@ -375,8 +378,8 @@ def pdf_resumen_dia(request, fecha):
         ("ALIGN", (0, 1), (0, -1), "CENTER"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         # Filas bien compactas: el máximo de movimientos por página
-        ("TOPPADDING", (0, 0), (-1, -1), 2),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0.5),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
         ("BACKGROUND", (0, fila_total), (-1, fila_total), NAVY),
         ("TEXTCOLOR", (0, fila_total), (-1, fila_total), colors.white),
         ("FONTNAME", (0, fila_total), (-1, fila_total), F_NEGRITA),
