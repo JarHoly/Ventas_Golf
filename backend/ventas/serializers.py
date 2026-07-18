@@ -46,3 +46,15 @@ class MovimientoSerializer(serializers.ModelSerializer):
             "subtotal", "total", "creado_en",
         ]
         read_only_fields = ["id", "numero", "creado_en"]
+
+    def validate(self, datos):
+        """El descuento no puede superar el monto de la línea (cantidad × precio):
+        un total negativo no tiene sentido y produce reportes confusos."""
+        cantidad = datos.get("cantidad", getattr(self.instance, "cantidad", 1))
+        precio = datos.get("precio_unitario", getattr(self.instance, "precio_unitario", 0))
+        descuento = datos.get("descuento", getattr(self.instance, "descuento", 0))
+        if descuento > cantidad * precio:
+            raise serializers.ValidationError(
+                {"descuento": "El descuento no puede ser mayor que cantidad × precio."}
+            )
+        return datos

@@ -29,9 +29,10 @@ ROJO = colors.HexColor("#C00000")
 
 
 def _fmt(valor, negativo=False):
-    """1500 -> '1,500.00' · con negativo=True -> '(1,500.00)' (estilo contable)."""
+    """1500 -> '1,500.00' · negativo (por bandera O por signo) -> '(1,500.00)'.
+    Nunca ocultamos el signo real: un valor negativo siempre sale entre paréntesis."""
     texto = f"{abs(valor):,.2f}"
-    return f"({texto})" if negativo else texto
+    return f"({texto})" if (negativo or valor < 0) else texto
 
 
 @api_view(["GET"])

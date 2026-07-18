@@ -444,6 +444,10 @@ function MovimientoForm({
       setError("Seleccioná la persona y el producto.");
       return;
     }
+    if (subtotal < 0) {
+      setError("El descuento no puede ser mayor que cantidad × precio.");
+      return;
+    }
     setGuardando(true);
     setError("");
     const cuerpo = {
