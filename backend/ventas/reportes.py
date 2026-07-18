@@ -161,9 +161,12 @@ def pdf_resumen_dia(request, fecha):
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9AA5B1")),
         ("ALIGN", (5, 1), (-1, -1), "RIGHT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        # Filas compactas (estilo Excel): más movimientos por página
-        ("TOPPADDING", (0, 0), (-1, -1), 1.5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5),
+        # Filas compactas (estilo Excel). El padding va asimétrico a propósito:
+        # el texto se apoya en su línea base y deja el hueco de los rasgos
+        # descendentes (g, p, y) abajo, así que se compensa con más aire arriba
+        # para que se VEA centrado verticalmente.
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
         # Fila TOTAL
         ("BACKGROUND", (0, fila_total), (-1, fila_total), NAVY),
         ("TEXTCOLOR", (0, fila_total), (-1, fila_total), colors.white),
