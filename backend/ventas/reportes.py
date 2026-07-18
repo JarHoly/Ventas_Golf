@@ -74,19 +74,21 @@ def pdf_resumen_dia(request, fecha):
     )
     elementos = []
 
-    # Barra de título azul
+    # Barra de título azul (leading = fontSize para que el texto quede
+    # centrado verticalmente en la franja, sin más aire abajo que arriba)
     titulo = Table(
         [[Paragraph(
             "RESUMEN DE MOVIMIENTOS DEL DÍA",
-            ParagraphStyle("t", fontName="Helvetica-Bold", fontSize=14, textColor=colors.white),
+            ParagraphStyle("t", fontName="Helvetica-Bold", fontSize=14, leading=14, textColor=colors.white),
         )]],
         colWidths=[doc.width],
     )
     titulo.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
     ]))
     elementos.append(titulo)
     elementos.append(Spacer(1, 4 * mm))
@@ -102,7 +104,12 @@ def pdf_resumen_dia(request, fecha):
         colWidths=[doc.width * 0.6, doc.width * 0.25, doc.width * 0.15],
     )
     elementos.append(encabezado)
-    elementos.append(Spacer(1, 4 * mm))
+    # Aclaración de la moneda
+    elementos.append(Paragraph(
+        "Montos expresados en dólares estadounidenses (USD)",
+        ParagraphStyle("usd", fontName="Helvetica-Oblique", fontSize=8, textColor=colors.HexColor("#64748B")),
+    ))
+    elementos.append(Spacer(1, 3 * mm))
 
     # ---------- Tabla principal ----------
     cabeceras = ["Cliente", "Tipo", "Movimiento", "Producto", "Método",
@@ -153,8 +160,9 @@ def pdf_resumen_dia(request, fecha):
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9AA5B1")),
         ("ALIGN", (5, 1), (-1, -1), "RIGHT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        # Filas compactas (estilo Excel): más movimientos por página
+        ("TOPPADDING", (0, 0), (-1, -1), 1.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5),
         # Fila TOTAL
         ("BACKGROUND", (0, fila_total), (-1, fila_total), NAVY),
         ("TEXTCOLOR", (0, fila_total), (-1, fila_total), colors.white),
