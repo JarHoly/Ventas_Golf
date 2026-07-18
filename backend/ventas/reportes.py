@@ -175,6 +175,9 @@ def _grafico_evolucion(ancho, alto, fecha_reporte):
     lc.categoryAxis.categoryNames = [dia.strftime("%d/%m") for dia in dias]
     lc.categoryAxis.labels.fontSize = 5
     lc.categoryAxis.labels.fontName = F_NORMAL
+    # tickShift: dibuja la rayita en el CENTRO de cada casilla (alineada con
+    # la fecha y el punto de la línea), no en el borde.
+    lc.categoryAxis.tickShift = 1
     lc.valueAxis.labels.fontSize = 5
     lc.valueAxis.labels.fontName = F_NORMAL
     d.add(lc)
@@ -311,7 +314,7 @@ def pdf_resumen_dia(request, fecha):
 
     ancho_grafico = W * 0.38 - 6
     caja_grafico = Table(
-        [[_p("EVOLUCIÓN POR MÉTODO DE PAGO — ÚLTIMOS 7 DÍAS (USD)", 7.5, NAVY, negrita=True)],
+        [[_p("EVOLUCIÓN POR MÉTODO DE PAGO - ÚLTIMOS 7 DÍAS (USD)", 7.5, NAVY, negrita=True)],
          [_grafico_evolucion(ancho_grafico - 12, 78, f)]],
         colWidths=[ancho_grafico],
     )
