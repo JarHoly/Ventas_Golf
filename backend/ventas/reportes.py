@@ -293,50 +293,42 @@ def pdf_resumen_dia(request, fecha):
     elementos.append(encabezado)
     elementos.append(Spacer(1, 4 * mm))
 
-    # ============ TARJETAS + GRÁFICO ============
-    # Cuadrícula 2x2: las tarjetas llenan la misma altura que el gráfico
-    # (sin espacio muerto debajo).
-    ancho_tarjetas = W * 0.62
-    ancho_tarjeta = ancho_tarjetas / 2 - 6
+    # ============ TARJETAS KPI (una fila de 4, a lo ancho) ============
+    ancho_kpi = W / 4
     tarjetas = Table(
-        [
-            [_tarjeta(ancho_tarjeta, "TOTAL MOVIMIENTOS", str(len(movimientos)), "Transacciones", NAVY, "#"),
-             _tarjeta(ancho_tarjeta, "VENTAS TOTALES", _fmt(total_ventas), "USD", VERDE, "+")],
-            [_tarjeta(ancho_tarjeta, "GASTOS TOTALES", _fmt(total_gastos), "USD", ROJO, "-"),
-             _tarjeta(ancho_tarjeta, "TOTAL GENERAL", _fmt(neto_total), "USD", MORADO, "$")],
-        ],
-        colWidths=[ancho_tarjetas / 2] * 2,
+        [[
+            _tarjeta(ancho_kpi - 8, "TOTAL MOVIMIENTOS", str(len(movimientos)), "Transacciones", NAVY, "#"),
+            _tarjeta(ancho_kpi - 8, "VENTAS TOTALES", _fmt(total_ventas), "USD", VERDE, "+"),
+            _tarjeta(ancho_kpi - 8, "GASTOS TOTALES", _fmt(total_gastos), "USD", ROJO, "-"),
+            _tarjeta(ancho_kpi - 8, "TOTAL GENERAL", _fmt(neto_total), "USD", MORADO, "$"),
+        ]],
+        colWidths=[ancho_kpi] * 4,
     )
     tarjetas.setStyle(TableStyle([
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (2, 0), 8),  # separación entre tarjetas
+        ("RIGHTPADDING", (3, 0), (3, 0), 0),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 6),  # separación entre las dos filas
-        ("BOTTOMPADDING", (0, 1), (-1, 1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
+    elementos.append(tarjetas)
+    elementos.append(Spacer(1, 5 * mm))
 
-    ancho_grafico = W * 0.38 - 6
+    # Caja del gráfico (se coloca luego junto a la dona, en la banda de análisis)
+    ancho_grafico = W * 0.56 - 6
     caja_grafico = Table(
-        [[_p("EVOLUCIÓN POR MÉTODO DE PAGO - ÚLTIMOS 7 DÍAS (USD)", 7.5, NAVY, negrita=True)],
-         [_grafico_evolucion(ancho_grafico - 12, 78, f)]],
+        [[_p("EVOLUCIÓN POR MÉTODO DE PAGO — ÚLTIMOS 7 DÍAS (USD)", 7.5, NAVY, negrita=True)],
+         [_grafico_evolucion(ancho_grafico - 14, 104, f)]],
         colWidths=[ancho_grafico],
+        rowHeights=[20, 112],
     )
     caja_grafico.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
         ("ROUNDEDCORNERS", [5, 5, 5, 5]),
-        ("TOPPADDING", (0, 0), (0, 0), 6),
+        ("TOPPADDING", (0, 0), (0, 0), 7),
+        ("LEFTPADDING", (0, 0), (0, 0), 8),
         ("BOTTOMPADDING", (0, -1), (0, -1), 4),
     ]))
-
-    fila_media = Table([[tarjetas, caja_grafico]], colWidths=[W * 0.62, W * 0.38])
-    fila_media.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    elementos.append(fila_media)
-    elementos.append(Spacer(1, 4 * mm))
 
     # ============ TABLA DE DETALLE ============
     # OJO: la tabla se AGREGA de última (después de la dona/observaciones).
@@ -425,13 +417,13 @@ def pdf_resumen_dia(request, fecha):
         ("LINEABOVE", (0, -1), (-1, -1), 0.6, BORDE),
     ]))
 
-    ancho_dist = W * 0.48 - 6
-    # Misma altura EXACTA que la caja de observaciones (18 + 5x24 = 138)
+    # Caja de distribución (dona + leyenda), a la derecha del gráfico.
+    ancho_dist = W * 0.44 - 6
     caja_dist = Table(
         [[_p("DISTRIBUCIÓN POR MÉTODO DE PAGO", 8.5, NAVY, negrita=True), ""],
          [_dona_metodos(neto_por_metodo), leyenda]],
-        colWidths=[110, ancho_dist - 110],
-        rowHeights=[20, 118],
+        colWidths=[100, ancho_dist - 100],
+        rowHeights=[20, 112],  # misma altura total que la caja del gráfico
     )
     caja_dist.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
@@ -439,34 +431,38 @@ def pdf_resumen_dia(request, fecha):
         ("SPAN", (0, 0), (1, 0)),
         ("VALIGN", (0, 1), (-1, 1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, 0), 7),
+        ("LEFTPADDING", (0, 0), (0, -1), 8),
     ]))
 
-    ancho_obs = W * 0.52 - 6
-    # Alturas calculadas para que esta caja mida IGUAL que la de distribución
-    # (título ~21 + fila de la dona ~107 = ~128)
-    filas_obs = [[_p("OBSERVACIONES", 8.5, NAVY, negrita=True)]] + [[""] for _ in range(5)]
-    caja_obs = Table(filas_obs, colWidths=[ancho_obs], rowHeights=[18] + [24] * 5)
-    estilo_obs = [
-        ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
-        ("ROUNDEDCORNERS", [5, 5, 5, 5]),
-        ("TOPPADDING", (0, 0), (0, 0), 6),
-    ]
-    for i in range(1, 6):  # líneas punteadas para escribir a mano
-        estilo_obs.append(("LINEBELOW", (0, i), (0, i), 0.6, BORDE, None, (2, 2)))
-    caja_obs.setStyle(TableStyle(estilo_obs))
-
-    fila_inferior = Table([[caja_dist, caja_obs]], colWidths=[W * 0.48, W * 0.52])
-    fila_inferior.setStyle(TableStyle([
+    # ---- Banda de análisis: gráfico (izq) + dona (der), lado a lado ----
+    banda_analisis = Table([[caja_grafico, caja_dist]], colWidths=[W * 0.56, W * 0.44])
+    banda_analisis.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
         ("RIGHTPADDING", (0, 0), (0, 0), 6),
         ("RIGHTPADDING", (-1, 0), (-1, 0), 0),
     ]))
-    elementos.append(fila_inferior)
+    elementos.append(banda_analisis)
+    elementos.append(Spacer(1, 5 * mm))
+
+    # ---- Observaciones: a lo ancho y compacta (elemento secundario) ----
+    filas_obs = [[_p("OBSERVACIONES", 8.5, NAVY, negrita=True)]] + [[""] for _ in range(3)]
+    caja_obs = Table(filas_obs, colWidths=[W], rowHeights=[18] + [20] * 3)
+    estilo_obs = [
+        ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
+        ("ROUNDEDCORNERS", [5, 5, 5, 5]),
+        ("TOPPADDING", (0, 0), (0, 0), 6),
+        ("LEFTPADDING", (0, 0), (0, -1), 10),
+        ("RIGHTPADDING", (0, 0), (0, -1), 10),
+    ]
+    for i in range(1, 4):  # líneas punteadas para escribir a mano
+        estilo_obs.append(("LINEBELOW", (0, i), (0, i), 0.6, BORDE, None, (2, 2)))
+    caja_obs.setStyle(TableStyle(estilo_obs))
+    elementos.append(caja_obs)
 
     # La tabla de detalle va al final: fluye a las páginas que necesite
     # (su cabecera se repite en cada página gracias a repeatRows=1).
-    elementos.append(Spacer(1, 4 * mm))
+    elementos.append(Spacer(1, 5 * mm))
     elementos.append(banda)
     elementos.append(tabla)
 
