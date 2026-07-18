@@ -294,22 +294,25 @@ def pdf_resumen_dia(request, fecha):
     elementos.append(Spacer(1, 4 * mm))
 
     # ============ TARJETAS + GRÁFICO ============
+    # Cuadrícula 2x2: las tarjetas llenan la misma altura que el gráfico
+    # (sin espacio muerto debajo).
     ancho_tarjetas = W * 0.62
-    ancho_tarjeta = ancho_tarjetas / 4 - 5
+    ancho_tarjeta = ancho_tarjetas / 2 - 6
     tarjetas = Table(
-        [[
-            _tarjeta(ancho_tarjeta, "TOTAL MOVIMIENTOS", str(len(movimientos)), "Transacciones", NAVY, "#"),
-            _tarjeta(ancho_tarjeta, "VENTAS TOTALES", _fmt(total_ventas), "USD", VERDE, "+"),
-            _tarjeta(ancho_tarjeta, "GASTOS TOTALES", _fmt(total_gastos), "USD", ROJO, "-"),
-            _tarjeta(ancho_tarjeta, "TOTAL GENERAL", _fmt(neto_total), "USD", MORADO, "$"),
-        ]],
-        colWidths=[ancho_tarjetas / 4] * 4,
+        [
+            [_tarjeta(ancho_tarjeta, "TOTAL MOVIMIENTOS", str(len(movimientos)), "Transacciones", NAVY, "#"),
+             _tarjeta(ancho_tarjeta, "VENTAS TOTALES", _fmt(total_ventas), "USD", VERDE, "+")],
+            [_tarjeta(ancho_tarjeta, "GASTOS TOTALES", _fmt(total_gastos), "USD", ROJO, "-"),
+             _tarjeta(ancho_tarjeta, "TOTAL GENERAL", _fmt(neto_total), "USD", MORADO, "$")],
+        ],
+        colWidths=[ancho_tarjetas / 2] * 2,
     )
     tarjetas.setStyle(TableStyle([
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 6),  # separación entre las dos filas
+        ("BOTTOMPADDING", (0, 1), (-1, 1), 0),
     ]))
 
     ancho_grafico = W * 0.38 - 6
@@ -423,10 +426,12 @@ def pdf_resumen_dia(request, fecha):
     ]))
 
     ancho_dist = W * 0.48 - 6
+    # Misma altura EXACTA que la caja de observaciones (18 + 5x24 = 138)
     caja_dist = Table(
         [[_p("DISTRIBUCIÓN POR MÉTODO DE PAGO", 8.5, NAVY, negrita=True), ""],
          [_dona_metodos(neto_por_metodo), leyenda]],
         colWidths=[110, ancho_dist - 110],
+        rowHeights=[20, 118],
     )
     caja_dist.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
@@ -440,7 +445,7 @@ def pdf_resumen_dia(request, fecha):
     # Alturas calculadas para que esta caja mida IGUAL que la de distribución
     # (título ~21 + fila de la dona ~107 = ~128)
     filas_obs = [[_p("OBSERVACIONES", 8.5, NAVY, negrita=True)]] + [[""] for _ in range(5)]
-    caja_obs = Table(filas_obs, colWidths=[ancho_obs], rowHeights=[18] + [22] * 5)
+    caja_obs = Table(filas_obs, colWidths=[ancho_obs], rowHeights=[18] + [24] * 5)
     estilo_obs = [
         ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
         ("ROUNDEDCORNERS", [5, 5, 5, 5]),
