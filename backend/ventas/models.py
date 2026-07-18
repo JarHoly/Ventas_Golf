@@ -64,8 +64,15 @@ class Producto(models.Model):
         SERVICIO = "Servicio", "Servicio"
         UNIDAD = "Unidad", "Unidad"
 
+    class Uso(models.TextChoices):
+        VENTA = "Venta", "Venta"
+        GASTO = "Gasto", "Gasto"
+
     nombre = models.CharField(max_length=150)
     tipo = models.CharField(max_length=10, choices=Tipo.choices, default=Tipo.UNIDAD)
+    # ¿Este producto se usa en Ventas o en Gastos? El modal de movimientos
+    # solo ofrece los productos que correspondan al tipo de movimiento.
+    uso = models.CharField(max_length=10, choices=Uso.choices, default=Uso.VENTA)
     precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
     categoria = models.ForeignKey(
         Categoria, on_delete=models.PROTECT, related_name="productos"

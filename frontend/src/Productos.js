@@ -68,6 +68,7 @@ export default function Productos() {
     const filas = items.map((p) => ({
       Nombre: p.nombre,
       Tipo: p.tipo,
+      Uso: p.uso,
       "Precio Unitario": Number(p.precio_unitario),
       Categoría: p.categoria_nombre,
     }));
@@ -132,6 +133,7 @@ export default function Productos() {
               <tr>
                 <th>Nombre</th>
                 <th>Tipo</th>
+                <th>Uso</th>
                 <th>Precio Unitario</th>
                 <th>Categoría</th>
                 <th>Acciones</th>
@@ -142,6 +144,11 @@ export default function Productos() {
                 <tr key={p.id}>
                   <td>{p.nombre}</td>
                   <td>{p.tipo}</td>
+                  <td>
+                    <span className={p.uso === "Gasto" ? "badge-gasto" : "badge-venta"}>
+                      {p.uso}
+                    </span>
+                  </td>
                   <td>${Number(p.precio_unitario).toFixed(2)}</td>
                   <td>{p.categoria_nombre}</td>
                   <td>
@@ -191,6 +198,7 @@ export default function Productos() {
 function ProductoForm({ existente, onClose, onGuardado }) {
   const [nombre, setNombre] = useState(existente?.nombre || "");
   const [tipo, setTipo] = useState(existente?.tipo || "Unidad");
+  const [uso, setUso] = useState(existente?.uso || "Venta");
   const [precio, setPrecio] = useState(existente?.precio_unitario || "");
   const [categoria, setCategoria] = useState(existente?.categoria || "");
   const [categorias, setCategorias] = useState([]);
@@ -212,6 +220,7 @@ function ProductoForm({ existente, onClose, onGuardado }) {
     const cuerpo = {
       nombre: nombre.trim(),
       tipo,
+      uso,
       precio_unitario: precio,
       categoria, // se manda el id de la categoría
     };
@@ -266,6 +275,16 @@ function ProductoForm({ existente, onClose, onGuardado }) {
                 {t}
               </option>
             ))}
+          </select>
+
+          <label className="form-label">Uso (¿en qué movimiento aparece?)</label>
+          <select
+            className="form-input"
+            value={uso}
+            onChange={(e) => setUso(e.target.value)}
+          >
+            <option>Venta</option>
+            <option>Gasto</option>
           </select>
 
           <label className="form-label">Precio unitario ($)</label>

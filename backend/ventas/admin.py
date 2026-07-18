@@ -18,8 +18,8 @@ class PersonaAdmin(admin.ModelAdmin):
 
 @admin.register(Producto)
 class ProductoAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "tipo", "precio_unitario", "categoria"]
-    list_filter = ["tipo", "categoria"]
+    list_display = ["nombre", "tipo", "uso", "precio_unitario", "categoria"]
+    list_filter = ["tipo", "uso", "categoria"]
     search_fields = ["nombre"]
 
 

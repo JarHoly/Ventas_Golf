@@ -421,11 +421,27 @@ function MovimientoForm({
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
+  // El modal solo ofrece los productos del tipo de movimiento elegido:
+  // Venta -> productos de venta, Gasto -> productos de gasto.
+  const opcionesProductoFiltradas = productos
+    .filter((p) => p.uso === tipo)
+    .map((p) => ({ id: p.id, label: `${p.nombre} — $${fmt(p.precio_unitario)}` }));
+
+  // Si cambia el tipo y el producto elegido ya no corresponde, se limpia.
+  function cambiarTipo(nuevo) {
+    setTipo(nuevo);
+    const p = productos.find((x) => String(x.id) === String(producto));
+    if (p && p.uso !== nuevo) {
+      setProducto("");
+      setPrecio("");
+    }
+  }
+
   // Al elegir persona: sugerimos el tipo (Proveedor -> Gasto, resto -> Venta).
   function elegirPersona(id) {
     setPersona(id);
     const p = personas.find((x) => String(x.id) === String(id));
-    if (p) setTipo(p.tipo === "Proveedor" ? "Gasto" : "Venta");
+    if (p) cambiarTipo(p.tipo === "Proveedor" ? "Gasto" : "Venta");
   }
 
   // Al elegir producto: se copia su precio (snapshot editable).
@@ -503,7 +519,7 @@ function MovimientoForm({
           <div className="fila-2">
             <div>
               <label className="form-label">Movimiento</label>
-              <select className="form-input" value={tipo} onChange={(e) => setTipo(e.target.value)}>
+              <select className="form-input" value={tipo} onChange={(e) => cambiarTipo(e.target.value)}>
                 <option>Venta</option>
                 <option>Gasto</option>
               </select>
@@ -518,9 +534,9 @@ function MovimientoForm({
             </div>
           </div>
 
-          <label className="form-label">Producto</label>
+          <label className="form-label">Producto ({tipo === "Gasto" ? "de gasto" : "de venta"})</label>
           <SearchableSelect
-            opciones={opcionesProducto}
+            opciones={opcionesProductoFiltradas}
             valor={producto}
             onChange={elegirProducto}
             placeholder="Escribí el producto para buscar..."
