@@ -1,5 +1,7 @@
 backend/venv/
-backend/__pycache__/
+# __pycache__ en CUALQUIER carpeta (antes solo cubría backend/__pycache__)
+__pycache__/
+*.pyc
 backend/staticfiles/
 backend/media/
 backend/db.sqlite3
