@@ -6,6 +6,7 @@ observaciones y pie de página con numeración.
 """
 import io
 from datetime import date
+from pathlib import Path
 
 from django.http import HttpResponse
 from rest_framework.decorators import api_view
@@ -22,9 +23,22 @@ from reportlab.graphics.shapes import Drawing, Rect, Circle, String
 from reportlab.graphics.charts.lineplots import LinePlot
 from reportlab.graphics.charts.piecharts import Pie
 
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
 from .models import Movimiento, CierreDia
 
 EMPRESA = "E Cuestas CORP AMERICA C.R. S.A."
+
+# ----- Fuente Inter (la del design system). Si faltaran los .ttf, cae a Helvetica. -----
+_FUENTES = Path(__file__).resolve().parent / "fonts"
+try:
+    pdfmetrics.registerFont(TTFont("Inter", str(_FUENTES / "Inter-Regular.ttf")))
+    pdfmetrics.registerFont(TTFont("Inter-Bold", str(_FUENTES / "Inter-Bold.ttf")))
+    pdfmetrics.registerFont(TTFont("Inter-Italic", str(_FUENTES / "Inter-Italic.ttf")))
+    F_NORMAL, F_NEGRITA, F_ITALICA = "Inter", "Inter-Bold", "Inter-Italic"
+except Exception:
+    F_NORMAL, F_NEGRITA, F_ITALICA = "Helvetica", "Helvetica-Bold", "Helvetica-Oblique"
 
 # ----- Paleta (design system del reporte) -----
 NAVY = colors.HexColor("#132F63")
@@ -49,7 +63,7 @@ def _fmt(valor, negativo=False):
 
 def _p(texto, tam=8, color=colors.black, negrita=False, italica=False, alin=0, leading=None):
     """Atajo para crear un Paragraph con estilo."""
-    fuente = "Helvetica-Bold" if negrita else ("Helvetica-Oblique" if italica else "Helvetica")
+    fuente = F_NEGRITA if negrita else (F_ITALICA if italica else F_NORMAL)
     return Paragraph(texto, ParagraphStyle(
         "s", fontName=fuente, fontSize=tam, textColor=color,
         alignment=alin, leading=leading or tam + 2,
@@ -79,7 +93,7 @@ class _CanvasNumerado(pdfcanvas.Canvas):
         self.setFillColor(NAVY)
         self.rect(0, 0, ancho, 9 * mm, fill=1, stroke=0)
         self.setFillColor(colors.white)
-        self.setFont("Helvetica", 8)
+        self.setFont(F_NORMAL, 8)
         self.drawString(8 * mm, 3.2 * mm, EMPRESA)
         self.drawRightString(ancho - 8 * mm, 3.2 * mm, f"Página {self._pageNumber} de {total}")
 
@@ -88,7 +102,7 @@ class _CanvasNumerado(pdfcanvas.Canvas):
 def _icono_circulo(color, glifo):
     d = Drawing(24, 24)
     d.add(Circle(12, 12, 11, fillColor=color, strokeColor=None))
-    d.add(String(12, 8, glifo, fontName="Helvetica-Bold", fontSize=12,
+    d.add(String(12, 8, glifo, fontName=F_NEGRITA, fontSize=12,
                  fillColor=colors.white, textAnchor="middle"))
     return d
 
@@ -105,7 +119,7 @@ def _icono_titulo():
 def _tarjeta(ancho, etiqueta, valor, sub, color, glifo):
     """Una tarjeta de resumen: icono circular + etiqueta + número grande."""
     textos = Table(
-        [[_p(etiqueta, 6.5, GRIS, negrita=True)],
+        [[_p(etiqueta, 6, GRIS, negrita=True)],
          [_p(valor, 13, color, negrita=True, leading=14)],
          [_p(sub, 7, GRIS)]],
         colWidths=[ancho - 42],
@@ -135,7 +149,7 @@ def _grafico_evolucion(ancho, alto, movimientos):
     x = 6
     for metodo in METODOS:
         d.add(Rect(x, alto - 10, 7, 5, fillColor=COLOR_METODO[metodo], strokeColor=None))
-        d.add(String(x + 10, alto - 9.5, metodo, fontName="Helvetica", fontSize=5.5, fillColor=GRIS))
+        d.add(String(x + 10, alto - 9.5, metodo, fontName=F_NORMAL, fontSize=5.5, fillColor=GRIS))
         x += 10 + 5.5 * 0.55 * len(metodo) + 12
 
     # Series: acumulado por método (ventas suman, gastos restan). Todas parten de (0, 0).
@@ -157,7 +171,9 @@ def _grafico_evolucion(ancho, alto, movimientos):
     lp.xValueAxis.valueMin = 0
     lp.xValueAxis.valueMax = max(1, len(movimientos))
     lp.xValueAxis.labels.fontSize = 5
+    lp.xValueAxis.labels.fontName = F_NORMAL
     lp.yValueAxis.labels.fontSize = 5
+    lp.yValueAxis.labels.fontName = F_NORMAL
     d.add(lp)
     return d
 
@@ -167,7 +183,7 @@ def _dona_metodos(neto_por_metodo):
     d = Drawing(95, 95)
     datos = [(m, neto_por_metodo[m]) for m in METODOS if neto_por_metodo[m] != 0]
     if not datos:
-        d.add(String(47, 45, "Sin datos", fontName="Helvetica", fontSize=7, fillColor=GRIS,
+        d.add(String(47, 45, "Sin datos", fontName=F_NORMAL, fontSize=7, fillColor=GRIS,
                      textAnchor="middle"))
         return d
     dona = Pie()
@@ -349,7 +365,8 @@ def pdf_resumen_dia(request, fecha):
     tabla.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), NAVY),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (-1, -1), F_NORMAL),
+        ("FONTNAME", (0, 0), (-1, 0), F_NEGRITA),
         ("ALIGN", (0, 0), (-1, 0), "CENTER"),
         ("FONTSIZE", (0, 0), (-1, -1), 7.5),
         ("GRID", (0, 0), (-1, -1), 0.4, BORDE),
@@ -362,7 +379,7 @@ def pdf_resumen_dia(request, fecha):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0.5),
         ("BACKGROUND", (0, fila_total), (-1, fila_total), NAVY),
         ("TEXTCOLOR", (0, fila_total), (-1, fila_total), colors.white),
-        ("FONTNAME", (0, fila_total), (-1, fila_total), "Helvetica-Bold"),
+        ("FONTNAME", (0, fila_total), (-1, fila_total), F_NEGRITA),
         # "TOTALES" ocupa las primeras columnas, alineado a la izquierda
         ("SPAN", (0, fila_total), (5, fila_total)),
         ("ALIGN", (0, fila_total), (0, fila_total), "LEFT"),
