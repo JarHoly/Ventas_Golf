@@ -473,6 +473,19 @@ def pdf_resumen_dia(request, fecha):
         7.5, GRIS, italica=True, alin=1,
     ))
 
+    # La tabla de detalle va al final: fluye a las páginas que necesite
+    # (su cabecera se repite en cada página gracias a repeatRows=1).
+    elementos.append(Spacer(1, 4 * mm))
+    elementos.append(banda)
+    elementos.append(tabla)
+
+    # Marcador de integridad: si falta la última hoja, se nota de inmediato.
+    elementos.append(Spacer(1, 3 * mm))
+    elementos.append(_p(
+        f"— Fin del detalle · {len(movimientos)} movimientos · Total {_fmt(neto_total, neto_total < 0)} USD —",
+        7.5, GRIS, italica=True, alin=1,
+    ))
+
     doc.build(elementos, canvasmaker=_CanvasNumerado)
     buffer.seek(0)
 
