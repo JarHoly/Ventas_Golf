@@ -19,15 +19,15 @@ import "./Dashboard.css";
 
 // Las secciones del sidebar. Agregar una nueva es solo sumar un objeto aquí.
 const MENU = [
-  { id: "clientes", label: "Clientes", icon: faUsers },
-  { id: "proveedores", label: "Proveedores", icon: faTruck },
-  { id: "categorias", label: "Categorías", icon: faTags },
-  { id: "productos", label: "Productos", icon: faBoxOpen },
   {
     id: "movimientos",
     label: "Movimientos Diarios",
     icon: faMoneyBillTransfer,
   },
+  { id: "clientes", label: "Clientes", icon: faUsers },
+  { id: "productos", label: "Productos", icon: faBoxOpen },
+  { id: "proveedores", label: "Proveedores", icon: faTruck },
+  { id: "categorias", label: "Categorías", icon: faTags },
 ];
 
 export default function Dashboard({ onLogout }) {
@@ -52,15 +52,39 @@ export default function Dashboard({ onLogout }) {
       const idx = [];
       personas.forEach((p) => {
         if (p.tipo === "Cliente")
-          idx.push({ tipo: "Cliente", icono: faUsers, label: `${p.codigo} · ${p.nombre}`, seccion: "clientes", term: p.nombre });
+          idx.push({
+            tipo: "Cliente",
+            icono: faUsers,
+            label: `${p.codigo} · ${p.nombre}`,
+            seccion: "clientes",
+            term: p.nombre,
+          });
         else if (p.tipo === "Proveedor")
-          idx.push({ tipo: "Proveedor", icono: faTruck, label: `${p.codigo} · ${p.nombre}`, seccion: "proveedores", term: p.nombre });
+          idx.push({
+            tipo: "Proveedor",
+            icono: faTruck,
+            label: `${p.codigo} · ${p.nombre}`,
+            seccion: "proveedores",
+            term: p.nombre,
+          });
       });
       productos.forEach((p) =>
-        idx.push({ tipo: "Producto", icono: faBoxOpen, label: p.nombre, seccion: "productos", term: p.nombre })
+        idx.push({
+          tipo: "Producto",
+          icono: faBoxOpen,
+          label: p.nombre,
+          seccion: "productos",
+          term: p.nombre,
+        }),
       );
       categorias.forEach((c) =>
-        idx.push({ tipo: "Categoría", icono: faTags, label: c.nombre, seccion: "categorias", term: c.nombre })
+        idx.push({
+          tipo: "Categoría",
+          icono: faTags,
+          label: c.nombre,
+          seccion: "categorias",
+          term: c.nombre,
+        }),
       );
       setCatalogo(idx);
     } catch {
@@ -116,7 +140,10 @@ export default function Dashboard({ onLogout }) {
         <div className="nav-right">
           <div className="nav-search-box" ref={cajaBusqueda}>
             <div className="nav-search">
-              <FontAwesomeIcon icon={faMagnifyingGlass} className="nav-search-icon" />
+              <FontAwesomeIcon
+                icon={faMagnifyingGlass}
+                className="nav-search-icon"
+              />
               <input
                 type="text"
                 placeholder="Buscar clientes, proveedores, productos..."
@@ -145,7 +172,10 @@ export default function Dashboard({ onLogout }) {
                       className="nav-result"
                       onClick={() => irAResultado(r)}
                     >
-                      <FontAwesomeIcon icon={r.icono} className="nav-result-icon" />
+                      <FontAwesomeIcon
+                        icon={r.icono}
+                        className="nav-result-icon"
+                      />
                       <span className="nav-result-label">{r.label}</span>
                       <span className="nav-result-tag">{r.tipo}</span>
                     </button>
@@ -156,7 +186,11 @@ export default function Dashboard({ onLogout }) {
           </div>
 
           <div className="nav-user">
-            <button className="nav-logout" onClick={onLogout} title="Cerrar sesión">
+            <button
+              className="nav-logout"
+              onClick={onLogout}
+              title="Cerrar sesión"
+            >
               <FontAwesomeIcon icon={faRightFromBracket} />
             </button>
           </div>
@@ -204,10 +238,16 @@ export default function Dashboard({ onLogout }) {
             />
           )}
           {seccion === "categorias" && (
-            <Categorias key={`categorias:${filtroInicial}`} filtroInicial={filtroInicial} />
+            <Categorias
+              key={`categorias:${filtroInicial}`}
+              filtroInicial={filtroInicial}
+            />
           )}
           {seccion === "productos" && (
-            <Productos key={`productos:${filtroInicial}`} filtroInicial={filtroInicial} />
+            <Productos
+              key={`productos:${filtroInicial}`}
+              filtroInicial={filtroInicial}
+            />
           )}
           {seccion === "movimientos" && <Movimientos />}
         </main>
