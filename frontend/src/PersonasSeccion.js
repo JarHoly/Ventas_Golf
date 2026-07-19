@@ -22,11 +22,12 @@ const POR_PAGINA = 10;
  *   <PersonasSeccion tipo="Cliente"   titulo="Clientes"    singular="cliente"   icono={faUsers} />
  *   <PersonasSeccion tipo="Proveedor" titulo="Proveedores" singular="proveedor" icono={faTruck} />
  */
-export default function PersonasSeccion({ tipo, titulo, singular, icono }) {
+export default function PersonasSeccion({ tipo, titulo, singular, icono, filtroInicial = "" }) {
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const [busqueda, setBusqueda] = useState("");
+  // Puede venir pre-cargado desde la búsqueda global del navbar.
+  const [busqueda, setBusqueda] = useState(filtroInicial);
   const [pagina, setPagina] = useState(1);
   // null = modal cerrado · {} = creando · {id,...} = editando ese registro
   const [enEdicion, setEnEdicion] = useState(null);
@@ -43,11 +44,9 @@ export default function PersonasSeccion({ tipo, titulo, singular, icono }) {
     }
   }
 
-  // Recargar cuando cambia el tipo (al pasar de Clientes a Proveedores).
+  // Cargar al montar. (El cambio de sección remonta el componente vía 'key'.)
   useEffect(() => {
     cargar();
-    setBusqueda("");
-    setPagina(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipo]);
 
