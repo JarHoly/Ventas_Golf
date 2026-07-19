@@ -17,11 +17,11 @@ import "./Crud.css";
 
 const POR_PAGINA = 10;
 
-export default function Categorias() {
+export default function Categorias({ filtroInicial = "" }) {
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const [busqueda, setBusqueda] = useState("");
+  const [busqueda, setBusqueda] = useState(filtroInicial);
   const [pagina, setPagina] = useState(1);
   const [enEdicion, setEnEdicion] = useState(null);
 
