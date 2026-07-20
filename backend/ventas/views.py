@@ -10,7 +10,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Persona, Categoria, Producto, Movimiento, CierreDia
+from .models import Persona, Categoria, Producto, Movimiento, CierreDia, ObservacionDia
+from .permisos import es_admin
 from .serializers import (
     PersonaSerializer,
     CategoriaSerializer,
@@ -133,14 +134,56 @@ def estado_dia(request, fecha):
         CierreDia.objects.get_or_create(fecha=fecha, defaults={"cerrado_por": request.user})
         return Response({"cerrado": True})
 
-    # DELETE: reabrir. Solo usuarios administradores (is_staff).
-    if not request.user.is_staff:
+    # DELETE: reabrir. Solo usuarios administradores.
+    if not es_admin(request.user):
         return Response(
             {"detail": "Solo un administrador puede reabrir un día."},
             status=status.HTTP_403_FORBIDDEN,
         )
     CierreDia.objects.filter(fecha=fecha).delete()
     return Response({"cerrado": False})
+
+
+def _obs_a_json(obs):
+    """ObservacionDia -> dict para el frontend (o vacío si no existe)."""
+    if obs is None:
+        return {"texto": "", "actualizado_en": None, "actualizado_por": None}
+    quien = obs.actualizado_por
+    return {
+        "texto": obs.texto,
+        "actualizado_en": obs.actualizado_en,
+        "actualizado_por": (quien.get_full_name() or quien.username) if quien else None,
+    }
+
+
+@api_view(["GET", "PUT"])
+def observacion_dia(request, fecha):
+    """
+    Observaciones del día (se imprimen en el PDF):
+      GET -> las lee cualquier usuario logueado
+      PUT -> {"texto": "..."} las guarda; SOLO administradores.
+    OJO: se pueden editar aunque el día esté cerrado — ese es justo el caso
+    de uso: agregar una nota después del cierre y regenerar el PDF.
+    """
+    if request.method == "GET":
+        obs = (
+            ObservacionDia.objects.filter(fecha=fecha)
+            .select_related("actualizado_por")
+            .first()
+        )
+        return Response(_obs_a_json(obs))
+
+    if not es_admin(request.user):
+        return Response(
+            {"detail": "Solo un administrador puede editar las observaciones."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    texto = (request.data.get("texto") or "").strip()
+    obs, _ = ObservacionDia.objects.update_or_create(
+        fecha=fecha,
+        defaults={"texto": texto, "actualizado_por": request.user},
+    )
+    return Response(_obs_a_json(obs))
 
 
 @api_view(["GET"])

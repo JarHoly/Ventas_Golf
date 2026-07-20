@@ -11,9 +11,10 @@ import {
   faLock,
   faLockOpen,
   faFlagCheckered,
+  faNoteSticky,
 } from "@fortawesome/free-solid-svg-icons";
 import Swal from "sweetalert2";
-import { apiGet, apiPost, apiPut, apiDelete, apiGetBlob } from "./api";
+import { apiGet, apiPost, apiPut, apiDelete, apiGetBlob, esAdmin } from "./api";
 import { confirmarEliminar, mostrarError, avisoExito } from "./alertas";
 import SearchableSelect from "./SearchableSelect";
 import "./Crud.css";
@@ -58,6 +59,10 @@ export default function Movimientos() {
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [filtros, setFiltros] = useState(FILTROS_VACIOS);
 
+  // Observaciones del día (salen impresas en el PDF; solo admin las edita).
+  const [obs, setObs] = useState({ texto: "", actualizado_en: null, actualizado_por: null });
+  const [modalObs, setModalObs] = useState(false);
+
   // Cargar catálogos una sola vez.
   useEffect(() => {
     Promise.all([apiGet("/personas/"), apiGet("/productos/"), apiGet("/categorias/")])
@@ -74,12 +79,14 @@ export default function Movimientos() {
     setCargando(true);
     setError("");
     try {
-      const [lista, estado] = await Promise.all([
+      const [lista, estado, observacion] = await Promise.all([
         apiGet(`/movimientos/?fecha=${f}`),
         apiGet(`/dias/${f}/`),
+        apiGet(`/dias/${f}/observacion/`),
       ]);
       setMovs(lista);
       setCerrado(estado.cerrado);
+      setObs(observacion);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -383,6 +390,56 @@ export default function Movimientos() {
         </div>
       )}
 
+      {/* ===== Observaciones del día (van impresas en el PDF) ===== */}
+      {!cargando && (
+        <div className="obs-card">
+          <div className="obs-head">
+            <h3>
+              <FontAwesomeIcon icon={faNoteSticky} /> Observaciones del día
+            </h3>
+            {esAdmin() && (
+              <button className="btn-ghost" onClick={() => setModalObs(true)}>
+                <FontAwesomeIcon icon={faPen} /> {obs.texto ? "Editar" : "Agregar"}
+              </button>
+            )}
+          </div>
+          {obs.texto ? (
+            <>
+              <p className="obs-texto">{obs.texto}</p>
+              <span className="obs-meta">
+                Última edición: {obs.actualizado_por || "—"} ·{" "}
+                {obs.actualizado_en
+                  ? new Date(obs.actualizado_en).toLocaleString("es-CR", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })
+                  : ""}
+              </span>
+            </>
+          ) : (
+            <p className="obs-vacia">
+              Sin observaciones.{" "}
+              {esAdmin()
+                ? "Lo que escribás acá queda guardado y sale impreso en el PDF, incluso si lo regenerás después."
+                : "Solo un administrador puede agregarlas; salen impresas en el PDF."}
+            </p>
+          )}
+        </div>
+      )}
+
+      {modalObs && (
+        <ObservacionForm
+          fecha={fecha}
+          textoInicial={obs.texto}
+          onClose={() => setModalObs(false)}
+          onGuardado={(nueva) => {
+            setObs(nueva);
+            setModalObs(false);
+            avisoExito("Observaciones guardadas");
+          }}
+        />
+      )}
+
       {(modalAgregar || enEdicion) && (
         <MovimientoForm
           fecha={fecha}
@@ -401,6 +458,67 @@ export default function Movimientos() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ===== Modal de observaciones del día (solo admin) =====
+function ObservacionForm({ fecha, textoInicial, onClose, onGuardado }) {
+  const [texto, setTexto] = useState(textoInicial || "");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  async function guardar(e) {
+    e.preventDefault();
+    setGuardando(true);
+    setError("");
+    try {
+      const nueva = await apiPut(`/dias/${fecha}/observacion/`, { texto });
+      onGuardado(nueva);
+    } catch (e2) {
+      setError(e2.message);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2 className="modal-title">
+          Observaciones del día
+          <span className="modal-fecha">{fecha.split("-").reverse().join("/")}</span>
+        </h2>
+
+        {error && <div className="alert-error">{error}</div>}
+
+        <form onSubmit={guardar}>
+          <label className="form-label">
+            Notas del día (salen impresas en el PDF)
+          </label>
+          <textarea
+            className="form-input obs-textarea"
+            rows={6}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Ej: Se recibió un pago pendiente de ayer; el cliente CR0012 quedó debiendo $20..."
+            autoFocus
+          />
+          <p className="form-hint">
+            Un solo texto por día: al guardar se reemplaza el anterior. Se puede
+            editar aunque el día esté cerrado, y el PDF se regenera con lo nuevo.
+          </p>
+
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={onClose}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn-primary" disabled={guardando}>
+              {guardando ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

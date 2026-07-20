@@ -21,6 +21,20 @@ export async function login(username, password) {
   return data;
 }
 
+// ===== Rol del usuario (lo guardó el login) =====
+// Solo controla qué se VE en pantalla: la seguridad real la pone el backend.
+export function rolUsuario() {
+  const rol = localStorage.getItem("rol") || sessionStorage.getItem("rol");
+  if (rol) return rol;
+  // Sesiones viejas (antes de los roles): el flag esAdmin decide.
+  const eraAdmin =
+    (localStorage.getItem("esAdmin") || sessionStorage.getItem("esAdmin")) === "1";
+  return eraAdmin ? "Admin" : "Operativo";
+}
+
+export const esAdmin = () => rolUsuario() === "Admin";
+export const esCliente = () => rolUsuario() === "Cliente";
+
 // ===== Helpers para llamadas que necesitan estar logueado =====
 
 // Recupera el token guardado (venga de "recuérdame" o de la sesión actual).
@@ -92,6 +106,18 @@ export async function apiDelete(path) {
 // Consulta el nombre en el padrón a partir de la cédula.
 export async function buscarCedula(cedula) {
   return apiGet(`/cedula/${cedula}/`);
+}
+
+// Sube un archivo (FormData). OJO: acá NO se manda Content-Type manual;
+// el navegador lo arma solo con el "boundary" del multipart.
+export async function apiPostForm(path, formData) {
+  return procesar(
+    await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      headers: { Authorization: `Token ${getToken()}` },
+      body: formData,
+    }),
+  );
 }
 
 // Descarga un archivo (ej. el PDF) mandando el token, y devuelve el blob.

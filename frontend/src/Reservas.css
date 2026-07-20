@@ -1,0 +1,382 @@
+/* ===== Módulo de reservas (staff + cliente) y notificaciones ===== */
+
+/* ---- Pestañas del staff ---- */
+.res-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  border-bottom: 2px solid #e3eaf3;
+}
+
+.res-tab {
+  border: none;
+  background: none;
+  padding: 9px 16px;
+  font-size: 0.9rem;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+
+.res-tab.activo {
+  color: #132f63;
+  font-weight: 700;
+  border-bottom-color: #132f63;
+}
+
+.res-filtros {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.res-filtros .form-input {
+  width: auto;
+}
+
+.res-hint {
+  flex: 1;
+  min-width: 220px;
+  font-size: 0.8rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* ---- Chips de estado ---- */
+.res-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.res-pendiente {
+  background: #fff4d6;
+  color: #8a6100;
+}
+
+.res-aceptada {
+  background: #e0f5e9;
+  color: #14713f;
+}
+
+.res-rechazada {
+  background: #fdecec;
+  color: #b21f1f;
+}
+
+.res-inactiva {
+  background: #e9edf3;
+  color: #64748b;
+}
+
+.res-chip-alerta {
+  background: #fdecec;
+  color: #b21f1f;
+}
+
+.res-sin {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.res-motivo {
+  cursor: help;
+  color: #64748b;
+}
+
+.btn-icon-ok {
+  border: none;
+  background: #e0f5e9;
+  color: #14713f;
+  border-radius: 7px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+.btn-icon-ok:hover {
+  background: #c8ecd8;
+}
+
+/* ---- Portal del cliente ---- */
+.res-subtitulo {
+  font-size: 1.02rem;
+  color: #132f63;
+  margin: 18px 0 10px;
+}
+
+.res-areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.res-area-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  background: #fff;
+  border: 1.5px solid #d8e0ec;
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+}
+
+.res-area-card:hover {
+  border-color: #7ea4d9;
+}
+
+.res-area-card.elegida {
+  border-color: #132f63;
+  box-shadow: 0 0 0 2px rgba(19, 47, 99, 0.15);
+}
+
+.res-area-nombre {
+  font-weight: 700;
+  color: #132f63;
+}
+
+.res-area-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.res-area-datos {
+  font-size: 0.82rem;
+  color: #22304a;
+  font-weight: 600;
+}
+
+/* Selector de fecha + franjas */
+.res-selector {
+  background: #fff;
+  border: 1px solid #d8e0ec;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.res-selector-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: #132f63;
+}
+
+.res-selector-top .btn-ghost {
+  margin-left: auto;
+}
+
+.res-fecha {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.res-fecha .form-input {
+  width: auto;
+}
+
+.res-franjas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.res-franja {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  padding: 9px 6px;
+  border: 1.5px solid #cfe0d8;
+  background: #f2faf5;
+  color: #14713f;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.res-franja span {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.res-franja:hover:not(:disabled) {
+  border-color: #14713f;
+}
+
+.res-franja.ocupada {
+  background: #f4f5f7;
+  border-color: #e2e6ec;
+  color: #9aa5b4;
+  cursor: not-allowed;
+}
+
+/* Mis reservas */
+.res-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.res-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #d8e0ec;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.res-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.res-item-titulo {
+  font-weight: 700;
+  color: #132f63;
+}
+
+.res-item-sub {
+  font-size: 0.85rem;
+  color: #22304a;
+}
+
+.res-item-motivo {
+  font-size: 0.8rem;
+  color: #b21f1f;
+}
+
+.res-item-aviso {
+  font-size: 0.8rem;
+  color: #8a6100;
+}
+
+.res-item-aviso.vencido {
+  color: #b21f1f;
+  font-weight: 700;
+}
+
+.res-item-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---- Campanita de notificaciones ---- */
+.notif-box {
+  position: relative;
+}
+
+.notif-btn {
+  position: relative;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #132f63;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.notif-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #d62828;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.notif-panel {
+  position: absolute;
+  right: 0;
+  top: 46px;
+  width: 330px;
+  max-width: 86vw;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #d8e0ec;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(16, 34, 61, 0.18);
+  z-index: 60;
+}
+
+.notif-titulo {
+  padding: 10px 14px;
+  font-weight: 700;
+  color: #132f63;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.notif-vacia {
+  padding: 18px 14px;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.notif-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.notif-item.nueva {
+  background: #f2f7ff;
+}
+
+.notif-item p {
+  margin: 0 0 3px;
+  font-size: 0.84rem;
+  color: #22304a;
+}
+
+.notif-item span {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+@media (max-width: 640px) {
+  .res-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

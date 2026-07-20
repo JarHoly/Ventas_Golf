@@ -1,0 +1,257 @@
+/* ===== Sección Informes (solo administradores) ===== */
+
+/* ---- Fila de filtros de período ---- */
+.inf-filtros {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #d8e0ec;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.inf-modo {
+  display: flex;
+  border: 1px solid #d8e0ec;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.inf-modo button {
+  border: none;
+  background: #fff;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: #64748b;
+}
+
+.inf-modo button.activo {
+  background: #132f63;
+  color: #fff;
+  font-weight: 600;
+}
+
+.inf-input {
+  border: 1px solid #d8e0ec;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  color: #22304a;
+}
+
+.inf-atajo {
+  border: 1px solid #d8e0ec;
+  background: #f5f8fc;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  color: #132f63;
+  cursor: pointer;
+}
+
+.inf-atajo:hover {
+  background: #e8eef6;
+}
+
+.inf-fecha-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.inf-comparado {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* ---- Tarjetas de totales ---- */
+.inf-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.inf-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #d8e0ec;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.inf-card-icon {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.inf-card-textos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.inf-card-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.inf-card-valor {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+/* La variación NO usa solo color: lleva flecha + texto siempre. */
+.inf-delta {
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.inf-delta-buena {
+  color: #1fa35c;
+}
+
+.inf-delta-mala {
+  color: #d62828;
+}
+
+.inf-delta-neutra {
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* ---- Cajas de gráficos ---- */
+.inf-charts {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 12px;
+}
+
+.inf-box {
+  background: #fff;
+  border: 1px solid #d8e0ec;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 16px;
+  min-width: 0; /* permite que los gráficos se encojan dentro del grid */
+}
+
+.inf-box-titulo {
+  margin: 0 0 10px;
+  font-size: 0.92rem;
+  color: #132f63;
+}
+
+.inf-box-sub {
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+/* ---- Dona + leyenda ---- */
+/* Dona arriba y leyenda debajo: lado a lado no caben en la columna. */
+.inf-dona-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* La dona tiene tamaño fijo: que el flex no la encoja. */
+.inf-dona-wrap .recharts-wrapper {
+  flex: 0 0 auto;
+}
+
+.inf-leyenda {
+  width: 100%;
+}
+
+.inf-leyenda {
+  flex: 1;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.inf-leyenda td {
+  padding: 5px 6px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.inf-leyenda td:nth-child(2),
+.inf-leyenda td:nth-child(3) {
+  text-align: right;
+}
+
+.inf-pct {
+  font-weight: 700;
+  color: #132f63;
+}
+
+.inf-cuadro {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 7px;
+  vertical-align: baseline;
+}
+
+.inf-rojo {
+  color: #d62828;
+}
+
+.inf-fila-total td {
+  background: #132f63;
+  color: #fff;
+  font-weight: 700;
+}
+
+.inf-fila-total td.inf-rojo {
+  color: #ffb4b4; /* rojo legible sobre navy */
+}
+
+.inf-tabla-scroll {
+  overflow-x: auto;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1100px) {
+  .inf-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .inf-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .inf-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .inf-comparado {
+    margin-left: 0;
+  }
+}

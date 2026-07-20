@@ -29,8 +29,13 @@ def login_view(request):
 
     # get_or_create: si ya tenía token se reusa, si no se crea uno.
     token, _ = Token.objects.get_or_create(user=user)
+    from ventas.permisos import rol_de
     return Response({
         "token": token.key,
         "username": user.username,
         "nombre": user.get_full_name() or user.username,
+        # El ROL decide qué ve el frontend (Admin / Operativo / Cliente).
+        # Es solo estético: la seguridad real la pone el backend en cada endpoint.
+        "rol": rol_de(user),
+        "is_staff": user.is_staff,  # compatibilidad con sesiones viejas
     })

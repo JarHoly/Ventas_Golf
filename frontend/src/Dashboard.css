@@ -20,10 +20,15 @@
   z-index: 10;
 }
 
+/* flex:1 + justify-content:flex-end: cuando NO hay buscador (portal del
+   cliente) la campanita y el botón de salir igual quedan pegados al borde
+   derecho, en vez de "flotar" a la izquierda de un hueco vacío. */
 .nav-right {
-  min-width: 700px;
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 20px;
 }
 
@@ -269,18 +274,13 @@
 
 /* Tablets (hasta 1024px): el buscador del navbar deja de forzar ancho fijo */
 @media (max-width: 1024px) {
-  .nav-right {
-    min-width: 0;
-    flex: 1;
-    justify-content: flex-end;
-  }
   .nav-search {
     max-width: 320px;
   }
 }
 
-/* Teléfonos (hasta 768px): el sidebar pasa a ser una fila deslizable arriba,
-   como pestañas. Es el patrón típico de apps móviles. */
+/* Teléfonos (hasta 768px): ajustes generales de espacio, en cualquier
+   orientación. */
 @media (max-width: 768px) {
   .navbar {
     gap: 12px;
@@ -293,6 +293,18 @@
     max-width: none;
   }
 
+  .content {
+    padding: 16px;
+  }
+  .page-header h1 {
+    font-size: 20px;
+  }
+}
+
+/* Teléfono en VERTICAL (hasta 768px de ancho): el sidebar pasa a ser una
+   fila deslizable arriba, como pestañas. En horizontal (landscape) sí hay
+   suficiente ancho para el sidebar normal, así que se deja tal cual. */
+@media (max-width: 768px) and (orientation: portrait) {
   .dash-body {
     flex-direction: column;
   }
@@ -316,13 +328,6 @@
     width: auto;
     flex-shrink: 0; /* cada pestaña mantiene su tamaño y la fila se desliza */
     padding: 9px 12px;
-  }
-
-  .content {
-    padding: 16px;
-  }
-  .page-header h1 {
-    font-size: 20px;
   }
 }
 

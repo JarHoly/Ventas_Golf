@@ -7,9 +7,12 @@ import {
   faRightToBracket,
 } from "@fortawesome/free-solid-svg-icons";
 import { login } from "./api";
+import { useIdioma } from "./i18n";
+import SelectorIdioma from "./SelectorIdioma";
 import "./Login.css";
 
 export default function Login({ onLogin }) {
+  const { t } = useIdioma();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,6 +31,10 @@ export default function Login({ onLogin }) {
       const storage = remember ? localStorage : sessionStorage;
       storage.setItem("token", data.token);
       storage.setItem("nombre", data.nombre);
+      // Guardamos el ROL para mostrar/ocultar secciones del dashboard.
+      // Esto es solo estético: la seguridad real la valida el backend.
+      storage.setItem("rol", data.rol || (data.is_staff ? "Admin" : "Operativo"));
+      storage.setItem("esAdmin", data.is_staff ? "1" : "0");
       onLogin(data);
     } catch (err) {
       setError(err.message);
@@ -47,6 +54,10 @@ export default function Login({ onLogin }) {
       <div className="login-overlay" />
 
       <div className="login-content">
+        <div className="login-idioma">
+          <SelectorIdioma variant="overlay" />
+        </div>
+
         {/* Tarjeta */}
         <form className="login-card" onSubmit={handleSubmit}>
           {/* Marca */}
@@ -55,14 +66,14 @@ export default function Login({ onLogin }) {
               <FontAwesomeIcon icon={faGolfBallTee} />
             </div>
             <h1 className="brand-name">E-Cuestas </h1>
-            <p className="brand-sub">Sistema de Ventas v1.0</p>
+            <p className="brand-sub">{t("login.subtitulo")}</p>
           </div>
-          <h2 className="card-title">¡Bienvenido de vuelta!</h2>
-          <p className="card-sub">Accede a tu panel de control de ventas</p>
+          <h2 className="card-title">{t("login.bienvenido")}</h2>
+          <p className="card-sub">{t("login.accede")}</p>
 
           {error && <div className="login-error">{error}</div>}
 
-          <label className="field-label">Usuario</label>
+          <label className="field-label">{t("login.usuario")}</label>
           <input
             className="field-input"
             type="text"
@@ -73,7 +84,7 @@ export default function Login({ onLogin }) {
           />
 
           <div className="field-label-row">
-            <label className="field-label">Contraseña</label>
+            <label className="field-label">{t("login.clave")}</label>
           </div>
           <div className="password-wrap">
             <input
@@ -99,15 +110,15 @@ export default function Login({ onLogin }) {
               checked={remember}
               onChange={(e) => setRemember(e.target.checked)}
             />
-            Recuérdame
+            {t("login.recuerdame")}
           </label>
 
           <button className="login-btn" type="submit" disabled={loading}>
             {loading ? (
-              "Ingresando..."
+              t("login.ingresando")
             ) : (
               <>
-                <FontAwesomeIcon icon={faRightToBracket} /> Iniciar Sesión
+                <FontAwesomeIcon icon={faRightToBracket} /> {t("login.iniciar_sesion")}
               </>
             )}
           </button>

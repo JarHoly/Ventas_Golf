@@ -2,6 +2,13 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "backend",
+      "runtimeExecutable": "C:\\Users\\Holye\\Desktop\\Corvana\\Ventas_Golf\\backend\\venv\\Scripts\\python.exe",
+      "runtimeArgs": ["manage.py", "runserver", "8000"],
+      "cwd": "backend",
+      "port": 8000
+    },
+    {
       "name": "frontend",
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
       "runtimeArgs": ["node_modules/react-scripts/bin/react-scripts.js", "start"],
