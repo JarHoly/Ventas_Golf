@@ -154,6 +154,57 @@ class Movimiento(models.Model):
         return self.subtotal
 
 
+class PerfilUsuario(models.Model):
+    """
+    El ROL de cada usuario del sistema. Complementa al User de Django:
+    - Admin / Operativo = personal del negocio.
+    - Cliente = solo el portal de reservas; 'persona' lo enlaza con su
+      ficha de la tabla Persona (código CRxxxx) si el personal la asoció.
+    """
+
+    class Rol(models.TextChoices):
+        ADMIN = "Admin", "Admin"
+        OPERATIVO = "Operativo", "Operativo"
+        CLIENTE = "Cliente", "Cliente"
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="perfil"
+    )
+    rol = models.CharField(max_length=10, choices=Rol.choices, default=Rol.OPERATIVO)
+    persona = models.ForeignKey(
+        Persona, on_delete=models.SET_NULL, null=True, blank=True, related_name="perfiles"
+    )
+
+    def __str__(self):
+        return f"{self.user.username} · {self.rol}"
+
+
+class ObservacionDia(models.Model):
+    """
+    Observaciones del día que se imprimen en el PDF. UN texto por fecha,
+    editable SOLO por administradores (lo valida la vista, no el modelo).
+
+    Va en tabla propia (y no como campo de CierreDia) a propósito: reabrir
+    un día BORRA su CierreDia, y las observaciones deben sobrevivir a eso.
+    """
+    fecha = models.DateField(unique=True)
+    texto = models.TextField(blank=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="observaciones",
+    )
+
+    class Meta:
+        ordering = ["-fecha"]
+
+    def __str__(self):
+        return f"Observaciones {self.fecha}"
+
+
 class CierreDia(models.Model):
     """
     "TERMINAR EL DÍA": si existe una fila aquí para una fecha, ese día está

@@ -1,5 +1,11 @@
 from django.contrib import admin
-from .models import Categoria, Persona, Producto, Movimiento
+from .models import Categoria, Persona, Producto, Movimiento, ObservacionDia, PerfilUsuario
+
+
+@admin.register(PerfilUsuario)
+class PerfilUsuarioAdmin(admin.ModelAdmin):
+    list_display = ["user", "rol", "persona"]
+    list_filter = ["rol"]
 
 
 @admin.register(Categoria)
@@ -21,6 +27,12 @@ class ProductoAdmin(admin.ModelAdmin):
     list_display = ["nombre", "tipo", "uso", "precio_unitario", "categoria"]
     list_filter = ["tipo", "uso", "categoria"]
     search_fields = ["nombre"]
+
+
+@admin.register(ObservacionDia)
+class ObservacionDiaAdmin(admin.ModelAdmin):
+    list_display = ["fecha", "texto", "actualizado_por", "actualizado_en"]
+    readonly_fields = ["actualizado_en"]
 
 
 @admin.register(Movimiento)

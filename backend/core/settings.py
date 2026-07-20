@@ -53,16 +53,18 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "corsheaders",
     "ventas",
+    "reservas",
 ]
 
-# DRF: por defecto, autenticar con token. Así cada endpoint futuro
-# (clientes, productos, movimientos) queda protegido salvo que digamos lo contrario.
+# DRF: por defecto, autenticar con token y SOLO PERSONAL (Admin/Operativo).
+# Los clientes del portal de reservas NO pueden tocar los datos del negocio:
+# cada endpoint del portal abre el acceso explícitamente con otro permiso.
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+        "ventas.permisos.EsPersonal",
     ],
 }
 
@@ -132,7 +134,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+# Hora local de Costa Rica: los sellos de tiempo (ej. "última edición" de las
+# observaciones) se MUESTRAN en hora CR. Internamente se sigue guardando UTC
+# (USE_TZ = True), así que no hay que migrar nada.
+TIME_ZONE = 'America/Costa_Rica'
 
 USE_I18N = True
 

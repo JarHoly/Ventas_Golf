@@ -44,6 +44,11 @@
   align-items: center;
 }
 
+.login-idioma {
+  align-self: flex-end;
+  margin-bottom: 14px;
+}
+
 /* ===== Marca ===== */
 .brand {
   text-align: center;

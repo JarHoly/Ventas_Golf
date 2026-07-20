@@ -1,0 +1,42 @@
+.selector-idioma {
+  display: inline-flex;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.selector-idioma button {
+  border: none;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+}
+
+/* Sobre el navbar blanco (Dashboard) */
+.selector-idioma-navbar {
+  border: 1px solid #d8e0ec;
+}
+.selector-idioma-navbar button {
+  background: #fff;
+  color: #64748b;
+}
+.selector-idioma-navbar button.activo {
+  background: #132f63;
+  color: #fff;
+}
+
+/* Sobre la foto del login: pastilla translúcida */
+.selector-idioma-overlay {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(4px);
+}
+.selector-idioma-overlay button {
+  background: transparent;
+  color: #1b3a6b;
+}
+.selector-idioma-overlay button.activo {
+  background: #1b3a6b;
+  color: #fff;
+}

@@ -26,7 +26,12 @@ from reportlab.graphics.charts.piecharts import Pie
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-from .models import Movimiento, CierreDia
+from xml.sax.saxutils import escape
+
+from django.utils import timezone
+
+from .models import Movimiento, CierreDia, ObservacionDia
+from .informes import calcular_informe, validar_rango, solo_admin
 
 EMPRESA = "E Cuestas CORP AMERICA C.R. S.A."
 
@@ -442,18 +447,49 @@ def pdf_resumen_dia(request, fecha):
     ]))
 
     ancho_obs = W * 0.52 - 6
-    # Alturas calculadas para que esta caja mida IGUAL que la de distribución
-    # (título ~21 + fila de la dona ~107 = ~128)
-    filas_obs = [[_p("OBSERVACIONES", 8.5, NAVY, negrita=True)]] + [[""] for _ in range(5)]
-    caja_obs = Table(filas_obs, colWidths=[ancho_obs], rowHeights=[18] + [24] * 5)
-    estilo_obs = [
-        ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
-        ("ROUNDEDCORNERS", [5, 5, 5, 5]),
-        ("TOPPADDING", (0, 0), (0, 0), 6),
-    ]
-    for i in range(1, 6):  # líneas punteadas para escribir a mano
-        estilo_obs.append(("LINEBELOW", (0, i), (0, i), 0.6, BORDE, None, (2, 2)))
-    caja_obs.setStyle(TableStyle(estilo_obs))
+    # Observaciones guardadas del día (las escribe un admin desde el sistema).
+    obs = ObservacionDia.objects.filter(fecha=fecha).select_related("actualizado_por").first()
+    texto_obs = obs.texto.strip() if obs else ""
+
+    if texto_obs:
+        # Con texto: se imprime (escapado, con saltos de línea) + quién y cuándo.
+        parrafo = _p(escape(texto_obs).replace("\n", "<br/>"), 8, leading=11.5)
+        quien = obs.actualizado_por
+        nombre = (quien.get_full_name() or quien.username) if quien else "—"
+        cuando = timezone.localtime(obs.actualizado_en).strftime("%d/%m/%Y %H:%M")
+        sello = _p(f"Última edición: {nombre} · {cuando}", 6.5, GRIS, italica=True)
+        # La caja debe medir LO MISMO que la de distribución (138pt) aunque la
+        # nota sea corta: medimos cuánto ocupa el texto y el sello absorbe el
+        # resto pegado al fondo. Si la nota es muy larga, la caja crece.
+        alto_texto = parrafo.wrap(ancho_obs - 12, 600)[1] + 8
+        alto_sello = max(16, 138 - 18 - alto_texto)
+        caja_obs = Table(
+            [[_p("OBSERVACIONES", 8.5, NAVY, negrita=True)], [parrafo], [sello]],
+            colWidths=[ancho_obs],
+            rowHeights=[18, alto_texto, alto_sello],
+        )
+        caja_obs.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
+            ("ROUNDEDCORNERS", [5, 5, 5, 5]),
+            ("TOPPADDING", (0, 0), (0, 0), 6),
+            ("TOPPADDING", (0, 1), (0, 1), 4),
+            ("VALIGN", (0, -1), (0, -1), "BOTTOM"),
+            ("BOTTOMPADDING", (0, -1), (0, -1), 6),
+        ]))
+    else:
+        # Sin texto: las líneas punteadas de siempre, por si escriben a mano.
+        # Alturas calculadas para que esta caja mida IGUAL que la de distribución
+        # (título ~21 + fila de la dona ~107 = ~128)
+        filas_obs = [[_p("OBSERVACIONES", 8.5, NAVY, negrita=True)]] + [[""] for _ in range(5)]
+        caja_obs = Table(filas_obs, colWidths=[ancho_obs], rowHeights=[18] + [24] * 5)
+        estilo_obs = [
+            ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
+            ("ROUNDEDCORNERS", [5, 5, 5, 5]),
+            ("TOPPADDING", (0, 0), (0, 0), 6),
+        ]
+        for i in range(1, 6):  # líneas punteadas para escribir a mano
+            estilo_obs.append(("LINEBELOW", (0, i), (0, i), 0.6, BORDE, None, (2, 2)))
+        caja_obs.setStyle(TableStyle(estilo_obs))
 
     fila_inferior = Table([[caja_dist, caja_obs]], colWidths=[W * 0.48, W * 0.52])
     fila_inferior.setStyle(TableStyle([
@@ -482,4 +518,287 @@ def pdf_resumen_dia(request, fecha):
 
     respuesta = HttpResponse(buffer.read(), content_type="application/pdf")
     respuesta["Content-Disposition"] = f'inline; filename="Resumen_{fecha}.pdf"'
+    return respuesta
+
+
+# ======================================================================
+# INFORME ADMINISTRATIVO (rango de fechas) — mismo lenguaje visual que
+# el resumen del día: banner navy, tarjetas, gráfico, dona y pie numerado.
+# ======================================================================
+
+def _variacion(actual, anterior):
+    """Texto de la comparativa de una tarjeta: '+12.3% vs período anterior'."""
+    if anterior == 0:
+        return "Sin datos del período anterior"
+    pct = (actual - anterior) / abs(anterior) * 100
+    signo = "+" if pct >= 0 else ""
+    return f"{signo}{pct:.1f}% vs período anterior"
+
+
+def _grafico_ventas_gastos(ancho, alto, puntos):
+    """Líneas de Ventas (verde) y Gastos (rojo) a lo largo del período.
+    Verde/rojo es un par difícil para daltonismo: por eso SIEMPRE va
+    acompañado de la leyenda con nombre (el color nunca viaja solo)."""
+    d = Drawing(ancho, alto)
+
+    x = 6
+    for nombre, color in (("Ventas", VERDE), ("Gastos", ROJO)):
+        d.add(Rect(x, alto - 10, 7, 5, fillColor=color, strokeColor=None))
+        d.add(String(x + 10, alto - 9.5, nombre, fontName=F_NORMAL, fontSize=6, fillColor=GRIS))
+        x += 52
+
+    lc = HorizontalLineChart()
+    lc.x, lc.y = 30, 14
+    lc.width, lc.height = ancho - 42, alto - 34
+    lc.data = [
+        tuple(p["ventas"] for p in puntos),
+        tuple(p["gastos"] for p in puntos),
+    ]
+    lc.lines[0].strokeColor = VERDE
+    lc.lines[1].strokeColor = ROJO
+    lc.lines[0].strokeWidth = 1.6
+    lc.lines[1].strokeWidth = 1.6
+    # Si hay muchos puntos, mostramos 1 de cada k etiquetas para que no se encimen.
+    paso = max(1, round(len(puntos) / 10))
+    lc.categoryAxis.categoryNames = [
+        p["etiqueta"] if i % paso == 0 else "" for i, p in enumerate(puntos)
+    ]
+    lc.categoryAxis.labels.fontSize = 5
+    lc.categoryAxis.labels.fontName = F_NORMAL
+    lc.categoryAxis.tickShift = 1
+    lc.valueAxis.labels.fontSize = 5
+    lc.valueAxis.labels.fontName = F_NORMAL
+    d.add(lc)
+    return d
+
+
+@api_view(["GET"])
+def pdf_informe(request):
+    """GET /api/reportes/resumen/pdf/?desde=YYYY-MM-DD&hasta=YYYY-MM-DD"""
+    error = solo_admin(request)
+    if error:
+        return error
+    rango, error = validar_rango(request)
+    if error:
+        return error
+    desde, hasta = rango
+    informe = calcular_informe(desde, hasta)
+    tot, ant = informe["totales"], informe["anterior"]
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=8 * mm, rightMargin=8 * mm,
+        topMargin=8 * mm, bottomMargin=14 * mm,
+        title=f"Informe administrativo {informe['desde']} a {informe['hasta']}",
+    )
+    W = doc.width
+    elementos = []
+
+    # ============ ENCABEZADO ============
+    titulo_textos = Table(
+        [[_p("INFORME", 12, colors.white, negrita=True, leading=13)],
+         [_p("ADMINISTRATIVO", 15, AZUL_CLARO, negrita=True, leading=16)]],
+        colWidths=[W * 0.40 - 44],
+    )
+    titulo_textos.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+    ]))
+    banner = Table([[_icono_titulo(), titulo_textos]], colWidths=[40, W * 0.40 - 40])
+    banner.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+        ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (0, 0), 8),
+    ]))
+
+    bloque_empresa = Table(
+        [[_p(EMPRESA, 12, NAVY, negrita=True)],
+         [_p("Montos expresados en dólares estadounidenses (USD)", 8, GRIS, italica=True)]],
+        colWidths=[W * 0.36],
+    )
+    bloque_empresa.setStyle(TableStyle([("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
+
+    bloque_periodo = Table(
+        [[_p("PERÍODO DEL INFORME:", 8, NAVY, negrita=True, alin=2)],
+         [_p(f"{desde.strftime('%d/%m/%Y')}  –  {hasta.strftime('%d/%m/%Y')}", 12, NAVY,
+             negrita=True, alin=2)]],
+        colWidths=[W * 0.24],
+    )
+    bloque_periodo.setStyle(TableStyle([("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
+
+    encabezado = Table(
+        [[banner, bloque_empresa, bloque_periodo]],
+        colWidths=[W * 0.40, W * 0.36, W * 0.24],
+    )
+    encabezado.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (0, 0), 0),
+        ("RIGHTPADDING", (-1, 0), (-1, 0), 0),
+    ]))
+    elementos.append(encabezado)
+    elementos.append(Spacer(1, 4 * mm))
+
+    # ============ TARJETAS (con comparativa vs período anterior) ============
+    ancho_tarjeta = W / 4 - 6
+    fila_tarjetas = Table(
+        [[
+            _tarjeta(ancho_tarjeta, "VENTAS TOTALES", _fmt(tot["ventas"]),
+                     _variacion(tot["ventas"], ant["ventas"]), VERDE, "+"),
+            _tarjeta(ancho_tarjeta, "GASTOS TOTALES", _fmt(tot["gastos"]),
+                     _variacion(tot["gastos"], ant["gastos"]), ROJO, "-"),
+            _tarjeta(ancho_tarjeta, "RESULTADO NETO", _fmt(tot["neto"], tot["neto"] < 0),
+                     _variacion(tot["neto"], ant["neto"]),
+                     ROJO if tot["neto"] < 0 else MORADO, "$"),
+            _tarjeta(ancho_tarjeta, "MOVIMIENTOS", str(tot["movimientos"]),
+                     _variacion(tot["movimientos"], ant["movimientos"]), NAVY, "#"),
+        ]],
+        colWidths=[W / 4] * 4,
+    )
+    fila_tarjetas.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-2, -1), 6),
+        ("RIGHTPADDING", (-1, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    elementos.append(fila_tarjetas)
+    elementos.append(Spacer(1, 4 * mm))
+
+    # ============ EVOLUCIÓN + DONA POR MÉTODO ============
+    puntos = informe["serie"]["puntos"]
+    etiqueta_serie = "POR DÍA" if informe["serie"]["agrupacion"] == "dia" else "POR MES"
+    ancho_grafico = W * 0.60 - 6
+    caja_grafico = Table(
+        [[_p(f"EVOLUCIÓN DE VENTAS Y GASTOS {etiqueta_serie} (USD)", 8, NAVY, negrita=True)],
+         [_grafico_ventas_gastos(ancho_grafico - 12, 132, puntos)]],
+        colWidths=[ancho_grafico],
+    )
+    caja_grafico.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
+        ("ROUNDEDCORNERS", [5, 5, 5, 5]),
+        ("TOPPADDING", (0, 0), (0, 0), 6),
+        ("BOTTOMPADDING", (0, -1), (0, -1), 4),
+    ]))
+
+    neto_por_metodo = {m["metodo"]: m["neto"] for m in informe["por_metodo"]}
+    movido_total = sum(abs(v) for v in neto_por_metodo.values())
+    filas_leyenda = []
+    for m in METODOS:
+        v = neto_por_metodo[m]
+        pct = (abs(v) / movido_total * 100) if movido_total else 0
+        cuadro = Drawing(8, 8)
+        cuadro.add(Rect(0, 0, 8, 8, fillColor=COLOR_METODO[m], strokeColor=None))
+        filas_leyenda.append([
+            cuadro, _p(m, 8),
+            _p(_fmt(v), 8, ROJO if v < 0 else colors.black, alin=2),
+            _p(f"{pct:.2f}%", 8, ROJO if v < 0 else NAVY, negrita=True, alin=2),
+        ])
+    filas_leyenda.append([
+        "", _p("TOTAL", 8, negrita=True),
+        _p(_fmt(tot["neto"], tot["neto"] < 0), 8, negrita=True, alin=2),
+        _p("100.00%" if movido_total else "0.00%", 8, NAVY, negrita=True, alin=2),
+    ])
+    leyenda = Table(filas_leyenda, colWidths=[14, 70, 62, 48])
+    leyenda.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ("LINEABOVE", (0, -1), (-1, -1), 0.6, BORDE),
+    ]))
+
+    ancho_dist = W * 0.40 - 6
+    caja_dist = Table(
+        [[_p("DISTRIBUCIÓN POR MÉTODO DE PAGO (NETO)", 8, NAVY, negrita=True), ""],
+         [_dona_metodos(neto_por_metodo), leyenda]],
+        colWidths=[105, ancho_dist - 105],
+        rowHeights=[20, 128],
+    )
+    caja_dist.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
+        ("ROUNDEDCORNERS", [5, 5, 5, 5]),
+        ("SPAN", (0, 0), (1, 0)),
+        ("VALIGN", (0, 1), (-1, 1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, 0), 7),
+    ]))
+
+    fila_media = Table([[caja_grafico, caja_dist]], colWidths=[W * 0.60, W * 0.40])
+    fila_media.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (0, 0), 6),
+        ("RIGHTPADDING", (-1, 0), (-1, 0), 0),
+    ]))
+    elementos.append(fila_media)
+    elementos.append(Spacer(1, 4 * mm))
+
+    # ============ TABLA POR CATEGORÍA ============
+    banda = Table([[_p("RESULTADO POR CATEGORÍA", 9, colors.white, negrita=True, alin=1)]],
+                  colWidths=[W])
+    banda.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    elementos.append(banda)
+
+    datos = [["Categoría", "Movimientos", "Ventas", "Gastos", "Neto"]]
+    estilos_filas = []
+    for idx, c in enumerate(informe["por_categoria"], start=1):
+        datos.append([
+            c["categoria"], str(c["movimientos"]),
+            _fmt(c["ventas"]), _fmt(c["gastos"], c["gastos"] > 0),
+            _fmt(c["neto"], c["neto"] < 0),
+        ])
+        if c["gastos"] > 0:
+            estilos_filas.append(("TEXTCOLOR", (3, idx), (3, idx), ROJO))
+        if c["neto"] < 0:
+            estilos_filas.append(("TEXTCOLOR", (4, idx), (4, idx), ROJO))
+    if not informe["por_categoria"]:
+        datos.append(["Sin movimientos en el período", "", "", "", ""])
+    datos.append(["TOTALES", str(tot["movimientos"]), _fmt(tot["ventas"]),
+                  _fmt(tot["gastos"], tot["gastos"] > 0),
+                  _fmt(tot["neto"], tot["neto"] < 0)])
+
+    fila_total = len(datos) - 1
+    tabla = Table(datos, colWidths=[W * a for a in (0.36, 0.14, 0.17, 0.17, 0.16)],
+                  repeatRows=1)
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, -1), F_NORMAL),
+        ("FONTNAME", (0, 0), (-1, 0), F_NEGRITA),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("GRID", (0, 0), (-1, -1), 0.4, BORDE),
+        ("ROWBACKGROUNDS", (0, 1), (-1, fila_total - 1), [colors.white, ZEBRA]),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5),
+        ("BACKGROUND", (0, fila_total), (-1, fila_total), NAVY),
+        ("TEXTCOLOR", (0, fila_total), (-1, fila_total), colors.white),
+        ("FONTNAME", (0, fila_total), (-1, fila_total), F_NEGRITA),
+        *estilos_filas,
+    ]))
+    elementos.append(tabla)
+
+    elementos.append(Spacer(1, 3 * mm))
+    elementos.append(_p(
+        f"— Informe del {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')} · "
+        f"{tot['movimientos']} movimientos · Neto {_fmt(tot['neto'], tot['neto'] < 0)} USD —",
+        7.5, GRIS, italica=True, alin=1,
+    ))
+
+    doc.build(elementos, canvasmaker=_CanvasNumerado)
+    buffer.seek(0)
+
+    respuesta = HttpResponse(buffer.read(), content_type="application/pdf")
+    respuesta["Content-Disposition"] = (
+        f'inline; filename="Informe_{informe["desde"]}_{informe["hasta"]}.pdf"'
+    )
     return respuesta
