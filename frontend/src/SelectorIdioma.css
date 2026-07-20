@@ -2,6 +2,12 @@
   display: inline-flex;
   border-radius: 999px;
   overflow: hidden;
+  /* Dentro de un flex container (el navbar), overflow:hidden hace que el
+     navegador considere su "mínimo automático" como 0 — así que en poco
+     espacio el flex-shrink lo aplasta a este elemento ANTES que a los
+     demás (que sí tienen un mínimo basado en su contenido). flex-shrink:0
+     lo protege: nunca se encoge más chico que su tamaño natural. */
+  flex-shrink: 0;
 }
 
 .selector-idioma button {

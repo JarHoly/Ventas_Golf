@@ -38,8 +38,7 @@ const MENU_PERSONAL = [
   { id: "proveedores", label: "Proveedores", icon: faTruck },
   { id: "categorias", label: "Categorías", icon: faTags },
   { id: "reservas", label: "Reservas", icon: faCalendarCheck },
-  // El informe es financiero: solo lo ven los administradores.
-  { id: "informes", label: "Informes", icon: faChartPie, soloAdmin: true },
+  { id: "informes", label: "Informes", icon: faChartPie },
 ];
 
 export default function Dashboard({ onLogout }) {

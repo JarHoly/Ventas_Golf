@@ -31,7 +31,7 @@ from xml.sax.saxutils import escape
 from django.utils import timezone
 
 from .models import Movimiento, CierreDia, ObservacionDia
-from .informes import calcular_informe, validar_rango, solo_admin
+from .informes import calcular_informe, validar_rango, solo_personal_negocio
 
 EMPRESA = "E Cuestas CORP AMERICA C.R. S.A."
 
@@ -575,7 +575,7 @@ def _grafico_ventas_gastos(ancho, alto, puntos):
 @api_view(["GET"])
 def pdf_informe(request):
     """GET /api/reportes/resumen/pdf/?desde=YYYY-MM-DD&hasta=YYYY-MM-DD"""
-    error = solo_admin(request)
+    error = solo_personal_negocio(request)
     if error:
         return error
     rango, error = validar_rango(request)

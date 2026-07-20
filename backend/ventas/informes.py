@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .models import Movimiento
-from .permisos import es_admin
+from .permisos import es_personal
 
 METODOS = ["Transferencia", "Efectivo", "Tarjeta", "Sinpe"]
 
@@ -212,12 +212,13 @@ def validar_rango(request):
     return (desde, hasta), None
 
 
-def solo_admin(request):
-    """El informe es financiero: solo administradores."""
-    if es_admin(request.user):
+def solo_personal_negocio(request):
+    """El informe lo puede ver todo el personal (Admin y Operativo).
+    Los clientes del portal NO — ya quedan fuera por EsPersonal (default)."""
+    if es_personal(request.user):
         return None
     return Response(
-        {"detail": "Solo un administrador puede ver el informe."},
+        {"detail": "Esta sección es solo para el personal del negocio."},
         status=status.HTTP_403_FORBIDDEN,
     )
 
@@ -225,7 +226,7 @@ def solo_admin(request):
 @api_view(["GET"])
 def informe_resumen(request):
     """GET /api/reportes/resumen/?desde=YYYY-MM-DD&hasta=YYYY-MM-DD"""
-    error = solo_admin(request)
+    error = solo_personal_negocio(request)
     if error:
         return error
     rango, error = validar_rango(request)
