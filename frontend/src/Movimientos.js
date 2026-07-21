@@ -526,7 +526,7 @@ function ObservacionForm({ fecha, textoInicial, onClose, onGuardado }) {
 // ===== Modal de agregar/editar movimiento =====
 // En modo agregar es "pegajoso": guarda y queda abierto para el siguiente.
 function MovimientoForm({
-  fecha, existente, personas, productos, opcionesPersona, opcionesProducto, onClose, onGuardado,
+  fecha, existente, personas, productos, opcionesProducto, onClose, onGuardado,
 }) {
   const editando = Boolean(existente);
   const [persona, setPersona] = useState(existente?.persona || "");
@@ -545,13 +545,24 @@ function MovimientoForm({
     .filter((p) => p.uso === tipo)
     .map((p) => ({ id: p.id, label: `${p.nombre} — $${fmt(p.precio_unitario)}` }));
 
-  // Si cambia el tipo y el producto elegido ya no corresponde, se limpia.
+  // El modal solo ofrece las personas que corresponden al tipo de movimiento:
+  // Gasto -> proveedores, Venta -> clientes y socios.
+  const opcionesPersonaFiltradas = personas
+    .filter((p) => (tipo === "Gasto" ? p.tipo === "Proveedor" : p.tipo !== "Proveedor"))
+    .map((p) => ({ id: p.id, label: `${p.codigo} · ${p.nombre} (${p.tipo})` }));
+
+  // Si cambia el tipo y el producto o la persona elegidos ya no corresponden, se limpian.
   function cambiarTipo(nuevo) {
     setTipo(nuevo);
     const p = productos.find((x) => String(x.id) === String(producto));
     if (p && p.uso !== nuevo) {
       setProducto("");
       setPrecio("");
+    }
+    const per = personas.find((x) => String(x.id) === String(persona));
+    if (per) {
+      const coincide = nuevo === "Gasto" ? per.tipo === "Proveedor" : per.tipo !== "Proveedor";
+      if (!coincide) setPersona("");
     }
   }
 
@@ -628,7 +639,7 @@ function MovimientoForm({
         <form onSubmit={guardar}>
           <label className="form-label">Persona (cliente, socio o proveedor)</label>
           <SearchableSelect
-            opciones={opcionesPersona}
+            opciones={opcionesPersonaFiltradas}
             valor={persona}
             onChange={elegirPersona}
             placeholder="Escribí el nombre para buscar..."

@@ -59,6 +59,11 @@
 .nav-search-box {
   position: relative;
   flex: 1;
+  /* Sin esto, un flex item con contenido no se encoge más allá de su
+     "mínimo automático" — en pantallas angostas eso desborda el navbar
+     por la izquierda (el buscador "empuja" a los demás elementos fuera
+     de la vista en vez de encogerse). */
+  min-width: 0;
   max-width: 520px;
   margin-left: auto;
 }
@@ -331,10 +336,14 @@
   }
 }
 
-/* Teléfonos chicos (hasta 480px): ocultamos el nombre de la marca
-   para darle todo el espacio al buscador */
+/* Teléfonos chicos (hasta 480px): ocultamos el nombre de la marca y
+   achicamos los espacios entre iconos para darle todo el espacio posible
+   al buscador (que igual se puede tocar y escribir; solo se ve angosto). */
 @media (max-width: 480px) {
   .nav-brand-name {
     display: none;
+  }
+  .nav-right {
+    gap: 10px;
   }
 }

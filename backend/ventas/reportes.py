@@ -31,7 +31,7 @@ from xml.sax.saxutils import escape
 from django.utils import timezone
 
 from .models import Movimiento, CierreDia, ObservacionDia
-from .informes import calcular_informe, validar_rango, solo_admin
+from .informes import calcular_informe, validar_rango, solo_personal_negocio
 
 EMPRESA = "E Cuestas CORP AMERICA C.R. S.A."
 
@@ -362,7 +362,8 @@ def pdf_resumen_dia(request, fecha):
     for idx, m in enumerate(movimientos, start=1):
         es_gasto = m.tipo == "Gasto"
         datos.append([
-            str(m.numero), m.persona.nombre, m.persona.tipo, m.tipo, m.producto.nombre,
+            str(m.numero), _p(escape(m.persona.nombre), 7.5, leading=8.5),
+            m.persona.tipo, m.tipo, _p(escape(m.producto.nombre), 7.5, leading=8.5),
             m.metodo, str(m.cantidad),
             _fmt(m.precio_unitario, es_gasto), _fmt(m.descuento),
             _fmt(m.subtotal, es_gasto), _fmt(0), _fmt(m.total, es_gasto),
@@ -575,7 +576,7 @@ def _grafico_ventas_gastos(ancho, alto, puntos):
 @api_view(["GET"])
 def pdf_informe(request):
     """GET /api/reportes/resumen/pdf/?desde=YYYY-MM-DD&hasta=YYYY-MM-DD"""
-    error = solo_admin(request)
+    error = solo_personal_negocio(request)
     if error:
         return error
     rango, error = validar_rango(request)
@@ -750,7 +751,7 @@ def pdf_informe(request):
     estilos_filas = []
     for idx, c in enumerate(informe["por_categoria"], start=1):
         datos.append([
-            c["categoria"], str(c["movimientos"]),
+            _p(escape(c["categoria"]), 8, leading=9.5), str(c["movimientos"]),
             _fmt(c["ventas"]), _fmt(c["gastos"], c["gastos"] > 0),
             _fmt(c["neto"], c["neto"] < 0),
         ])
