@@ -8,12 +8,14 @@ import {
   faSpinner,
   faFilter,
   faFilePdf,
+  faFileExcel,
   faLock,
   faLockOpen,
   faFlagCheckered,
   faNoteSticky,
 } from "@fortawesome/free-solid-svg-icons";
 import Swal from "sweetalert2";
+import * as XLSX from "xlsx";
 import { apiGet, apiPost, apiPut, apiDelete, apiGetBlob, esAdmin } from "./api";
 import { confirmarEliminar, mostrarError, avisoExito } from "./alertas";
 import SearchableSelect from "./SearchableSelect";
@@ -21,18 +23,16 @@ import "./Crud.css";
 import "./Movimientos.css";
 
 const METODOS = ["Efectivo", "Tarjeta", "Sinpe", "Transferencia"];
+const SIMBOLOS = { USD: "$", CRC: "₡" };
 
 // Formatea 1500 -> "1,500.00"
 const fmt = (n) =>
   Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // Los montos de un gasto se muestran en rojo y entre paréntesis (estilo contable).
-function Monto({ valor, gasto }) {
-  return (
-    <span className={gasto ? "monto-gasto" : ""}>
-      {gasto ? `(${fmt(valor)})` : fmt(valor)}
-    </span>
-  );
+function Monto({ valor, gasto, moneda = "USD" }) {
+  const texto = `${SIMBOLOS[moneda] || "$"}${fmt(valor)}`;
+  return <span className={gasto ? "monto-gasto" : ""}>{gasto ? `(${texto})` : texto}</span>;
 }
 
 const hoy = () => {
@@ -43,11 +43,18 @@ const hoy = () => {
 const FILTROS_VACIOS = { persona: "", producto: "", metodo: "", categoria: "", montoMin: "", montoMax: "" };
 
 export default function Movimientos() {
+  // "dia" = la vista de siempre (agregar/editar/terminar el día).
+  // "rango" = solo consulta: varios días a la vez, con los mismos filtros,
+  // para generar un PDF o Excel de lo que se ve en pantalla.
+  const [modo, setModo] = useState("dia");
   const [fecha, setFecha] = useState(hoy());
+  const [desde, setDesde] = useState(hoy());
+  const [hasta, setHasta] = useState(hoy());
   const [movs, setMovs] = useState([]);
   const [cerrado, setCerrado] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+  const [generandoPdf, setGenerandoPdf] = useState(false);
 
   // Catálogos para los selects con búsqueda (se cargan una vez).
   const [personas, setPersonas] = useState([]);
@@ -95,12 +102,44 @@ export default function Movimientos() {
   }
 
   useEffect(() => {
+    if (modo !== "dia") return;
     cargarDia(fecha);
     setModalAgregar(false);
     setEnEdicion(null);
     setFiltros(FILTROS_VACIOS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fecha]);
+  }, [modo, fecha]);
+
+  // Modo "Rango de fechas": trae los movimientos de varios días de una vez.
+  // Es solo consulta (no se agrega/edita/borra desde acá), así que no hace
+  // falta el estado del día ni las observaciones.
+  const rangoValido = Boolean(desde && hasta && desde <= hasta);
+
+  async function cargarRango() {
+    if (!rangoValido) return;
+    setCargando(true);
+    setError("");
+    try {
+      setMovs(await apiGet(`/movimientos/?desde=${desde}&hasta=${hasta}`));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  useEffect(() => {
+    if (modo !== "rango") return;
+    cargarRango();
+    setFiltros(FILTROS_VACIOS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modo, desde, hasta]);
+
+  function cambiarModo(nuevo) {
+    setModo(nuevo);
+    setMostrarFiltros(false);
+    setFiltros(FILTROS_VACIOS);
+  }
 
   async function eliminar(id) {
     if (!(await confirmarEliminar("este movimiento"))) return;
@@ -165,21 +204,80 @@ export default function Movimientos() {
     }
   }
 
+  // Arma la query string del rango + los mismos filtros avanzados que ya
+  // están aplicados en pantalla, para que el PDF/Excel traigan exactamente
+  // lo que se está viendo.
+  function queryRango() {
+    const p = new URLSearchParams({ desde, hasta });
+    if (filtros.persona) p.set("persona", filtros.persona);
+    if (filtros.producto) p.set("producto", filtros.producto);
+    if (filtros.metodo) p.set("metodo", filtros.metodo);
+    if (filtros.categoria) p.set("categoria", filtros.categoria);
+    if (filtros.montoMin !== "") p.set("monto_min", filtros.montoMin);
+    if (filtros.montoMax !== "") p.set("monto_max", filtros.montoMax);
+    return p.toString();
+  }
+
+  async function generarPdfRango() {
+    setGenerandoPdf(true);
+    try {
+      const blob = await apiGetBlob(`/reportes/rango/pdf/?${queryRango()}`);
+      window.open(URL.createObjectURL(blob), "_blank");
+    } catch (e) {
+      mostrarError(e.message);
+    } finally {
+      setGenerandoPdf(false);
+    }
+  }
+
+  // El Excel se arma del lado del cliente, con lo mismo que se ve en la
+  // tabla (misma lista ya filtrada): no hace falta ir de nuevo al backend.
+  function exportarExcelRango() {
+    const filas = visibles.map((m) => ({
+      "#": m.numero,
+      Fecha: m.fecha,
+      "Cliente / Proveedor": m.persona_nombre,
+      Tipo: m.persona_tipo,
+      Movimiento: m.tipo,
+      Producto: m.producto_nombre,
+      Método: m.metodo,
+      Moneda: m.moneda,
+      Cantidad: m.cantidad,
+      "Precio Unit": Number(m.precio_unitario),
+      Descuento: Number(m.descuento),
+      SubTotal: Number(m.subtotal),
+      Total: Number(m.total),
+    }));
+    const hoja = XLSX.utils.json_to_sheet(filas);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Movimientos");
+    XLSX.writeFile(libro, `Movimientos_${desde}_${hasta}.xlsx`);
+  }
+
   // ---------- Filtros avanzados (sobre la lista ya cargada) ----------
   const visibles = movs.filter((m) => {
     if (filtros.persona && String(m.persona) !== String(filtros.persona)) return false;
     if (filtros.producto && String(m.producto) !== String(filtros.producto)) return false;
     if (filtros.metodo && m.metodo !== filtros.metodo) return false;
     if (filtros.categoria && String(m.categoria_id) !== String(filtros.categoria)) return false;
+    // El filtro de monto compara el total de cada movimiento EN SU PROPIA
+    // moneda (no se convierte ni se mezcla USD con CRC).
     if (filtros.montoMin !== "" && Number(m.total) < Number(filtros.montoMin)) return false;
     if (filtros.montoMax !== "" && Number(m.total) > Number(filtros.montoMax)) return false;
     return true;
   });
   const hayFiltros = JSON.stringify(filtros) !== JSON.stringify(FILTROS_VACIOS);
 
-  // Totales del día (sobre lo visible).
-  const totalVentas = visibles.filter((m) => m.tipo === "Venta").reduce((s, m) => s + Number(m.total), 0);
-  const totalGastos = visibles.filter((m) => m.tipo === "Gasto").reduce((s, m) => s + Number(m.total), 0);
+  // Totales del día (sobre lo visible), SEPARADOS por moneda: no se convierte
+  // ni se suma dólares con colones.
+  const sumaPor = (tipo, moneda) =>
+    visibles
+      .filter((m) => m.tipo === tipo && m.moneda === moneda)
+      .reduce((s, m) => s + Number(m.total), 0);
+  const totalVentas = sumaPor("Venta", "USD");
+  const totalGastos = sumaPor("Gasto", "USD");
+  const totalVentasCRC = sumaPor("Venta", "CRC");
+  const totalGastosCRC = sumaPor("Gasto", "CRC");
 
   // Etiquetas para los selects con búsqueda.
   const opcionesPersona = personas.map((p) => ({ id: p.id, label: `${p.codigo} · ${p.nombre} (${p.tipo})` }));
@@ -193,27 +291,47 @@ export default function Movimientos() {
           <h1>Movimientos Diarios</h1>
         </div>
         <div className="page-actions">
-          {cerrado ? (
-            <>
-              <span className="chip-cerrado">
-                <FontAwesomeIcon icon={faLock} /> Día terminado
-              </span>
-              <button className="btn-secondary btn-wide" onClick={verPdf}>
-                <FontAwesomeIcon icon={faFilePdf} /> Ver PDF
-              </button>
-              <button className="btn-ghost" onClick={reabrirDia}>
-                <FontAwesomeIcon icon={faLockOpen} /> Reabrir día
-              </button>
-            </>
+          {modo === "dia" ? (
+            cerrado ? (
+              <>
+                <span className="chip-cerrado">
+                  <FontAwesomeIcon icon={faLock} /> Día terminado
+                </span>
+                <button className="btn-secondary btn-wide" onClick={verPdf}>
+                  <FontAwesomeIcon icon={faFilePdf} /> Ver PDF
+                </button>
+                <button className="btn-ghost" onClick={reabrirDia}>
+                  <FontAwesomeIcon icon={faLockOpen} /> Reabrir día
+                </button>
+              </>
+            ) : (
+              <>
+                {movs.length > 0 && (
+                  <button className="btn-terminar" onClick={terminarDia}>
+                    <FontAwesomeIcon icon={faFlagCheckered} /> Terminar el día
+                  </button>
+                )}
+                <button className="btn-primary" onClick={() => setModalAgregar(true)}>
+                  <FontAwesomeIcon icon={faPlus} /> Agregar movimiento
+                </button>
+              </>
+            )
           ) : (
             <>
-              {movs.length > 0 && (
-                <button className="btn-terminar" onClick={terminarDia}>
-                  <FontAwesomeIcon icon={faFlagCheckered} /> Terminar el día
-                </button>
-              )}
-              <button className="btn-primary" onClick={() => setModalAgregar(true)}>
-                <FontAwesomeIcon icon={faPlus} /> Agregar movimiento
+              <button
+                className="btn-secondary btn-wide"
+                onClick={exportarExcelRango}
+                disabled={!rangoValido || visibles.length === 0}
+              >
+                <FontAwesomeIcon icon={faFileExcel} /> Exportar a Excel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={generarPdfRango}
+                disabled={!rangoValido || generandoPdf}
+              >
+                <FontAwesomeIcon icon={generandoPdf ? faSpinner : faFilePdf} spin={generandoPdf} />{" "}
+                Generar PDF
               </button>
             </>
           )}
@@ -222,17 +340,51 @@ export default function Movimientos() {
 
       {error && <div className="alert-error">{error}</div>}
 
-      {/* Barra: fecha + filtros */}
+      {/* Barra: modo + fecha(s) + filtros */}
       <div className="dia-barra">
-        <label className="dia-label">
-          Día:
-          <input
-            type="date"
-            className="form-input dia-input"
-            value={fecha}
-            onChange={(e) => e.target.value && setFecha(e.target.value)}
-          />
-        </label>
+        <div className="modo-toggle">
+          <button className={modo === "dia" ? "activo" : ""} onClick={() => cambiarModo("dia")}>
+            Día único
+          </button>
+          <button className={modo === "rango" ? "activo" : ""} onClick={() => cambiarModo("rango")}>
+            Rango de fechas
+          </button>
+        </div>
+        {modo === "dia" ? (
+          <label className="dia-label">
+            Día:
+            <input
+              type="date"
+              className="form-input dia-input"
+              value={fecha}
+              onChange={(e) => e.target.value && setFecha(e.target.value)}
+            />
+          </label>
+        ) : (
+          <>
+            <label className="dia-label">
+              Desde:
+              <input
+                type="date"
+                className="form-input dia-input"
+                value={desde}
+                onChange={(e) => e.target.value && setDesde(e.target.value)}
+              />
+            </label>
+            <label className="dia-label">
+              Hasta:
+              <input
+                type="date"
+                className="form-input dia-input"
+                value={hasta}
+                onChange={(e) => e.target.value && setHasta(e.target.value)}
+              />
+            </label>
+            {!rangoValido && (
+              <span className="alert-error">La fecha "desde" debe ser anterior (o igual) a "hasta".</span>
+            )}
+          </>
+        )}
         <button
           className={"btn-ghost" + (mostrarFiltros || hayFiltros ? " filtros-activos" : "")}
           onClick={() => setMostrarFiltros((v) => !v)}
@@ -289,7 +441,7 @@ export default function Movimientos() {
             </select>
           </div>
           <div className="filtro-campo">
-            <label className="form-label">Monto (total)</label>
+            <label className="form-label">Monto (total, en su propia moneda)</label>
             <div className="montos-row">
               <input
                 type="number"
@@ -320,28 +472,34 @@ export default function Movimientos() {
           <div className="table-empty">
             <FontAwesomeIcon icon={faSpinner} spin /> Cargando...
           </div>
-        ) : movs.length === 0 ? (
+        ) : modo === "dia" && movs.length === 0 ? (
           <div className="table-empty">
             No hay movimientos el {fecha.split("-").reverse().join("/")}. Agregá el primero.
           </div>
         ) : visibles.length === 0 ? (
-          <div className="table-empty">Ningún movimiento coincide con los filtros.</div>
+          <div className="table-empty">
+            {modo === "rango"
+              ? "Ningún movimiento coincide con el rango y los filtros elegidos."
+              : "Ningún movimiento coincide con los filtros."}
+          </div>
         ) : (
           <table className="data-table tabla-movs">
             <thead>
               <tr>
                 <th>#</th>
+                {modo === "rango" && <th>Fecha</th>}
                 <th>Nombre</th>
                 <th>Tipo</th>
                 <th>Movimiento</th>
                 <th>Producto</th>
                 <th>Método</th>
+                <th>Moneda</th>
                 <th>Cant</th>
                 <th>Precio Unit</th>
                 <th>Descuento</th>
                 <th>SubTotal</th>
                 <th>Total</th>
-                {!cerrado && <th>Acciones</th>}
+                {modo === "dia" && !cerrado && <th>Acciones</th>}
               </tr>
             </thead>
             <tbody>
@@ -350,6 +508,7 @@ export default function Movimientos() {
                 return (
                   <tr key={m.id}>
                     <td className="codigo-cell">{m.numero}</td>
+                    {modo === "rango" && <td>{m.fecha.split("-").reverse().join("/")}</td>}
                     <td>{m.persona_nombre}</td>
                     <td>{m.persona_tipo}</td>
                     <td>
@@ -357,12 +516,15 @@ export default function Movimientos() {
                     </td>
                     <td>{m.producto_nombre}</td>
                     <td>{m.metodo}</td>
+                    <td>
+                      <span className="badge-moneda">{m.moneda}</span>
+                    </td>
                     <td className="num">{m.cantidad}</td>
-                    <td className="num"><Monto valor={m.precio_unitario} gasto={g} /></td>
-                    <td className="num">{fmt(m.descuento)}</td>
-                    <td className="num"><Monto valor={m.subtotal} gasto={g} /></td>
-                    <td className="num"><Monto valor={m.total} gasto={g} /></td>
-                    {!cerrado && (
+                    <td className="num"><Monto valor={m.precio_unitario} gasto={g} moneda={m.moneda} /></td>
+                    <td className="num">{SIMBOLOS[m.moneda]}{fmt(m.descuento)}</td>
+                    <td className="num"><Monto valor={m.subtotal} gasto={g} moneda={m.moneda} /></td>
+                    <td className="num"><Monto valor={m.total} gasto={g} moneda={m.moneda} /></td>
+                    {modo === "dia" && !cerrado && (
                       <td>
                         <button className="btn-icon-edit" onClick={() => setEnEdicion(m)} title="Editar">
                           <FontAwesomeIcon icon={faPen} />
@@ -384,14 +546,32 @@ export default function Movimientos() {
       {visibles.length > 0 && (
         <div className="resumen-dia">
           <span>Movimientos: <b>{visibles.length}</b>{hayFiltros ? ` (de ${movs.length})` : ""}</span>
-          <span>Ventas: <b>${fmt(totalVentas)}</b></span>
-          <span>Gastos: <b className="monto-gasto">(${fmt(totalGastos)})</b></span>
-          <span>Neto: <Monto valor={Math.abs(totalVentas - totalGastos)} gasto={totalVentas - totalGastos < 0} /></span>
+          <span>
+            Ventas: <b>${fmt(totalVentas)}</b>
+            {totalVentasCRC > 0 && <b> + ₡{fmt(totalVentasCRC)}</b>}
+          </span>
+          <span>
+            Gastos: <b className="monto-gasto">(${fmt(totalGastos)})</b>
+            {totalGastosCRC > 0 && <b className="monto-gasto"> + (₡{fmt(totalGastosCRC)})</b>}
+          </span>
+          <span>
+            Neto: <Monto valor={Math.abs(totalVentas - totalGastos)} gasto={totalVentas - totalGastos < 0} />
+            {totalVentasCRC > 0 || totalGastosCRC > 0 ? (
+              <>
+                {" + "}
+                <Monto
+                  valor={Math.abs(totalVentasCRC - totalGastosCRC)}
+                  gasto={totalVentasCRC - totalGastosCRC < 0}
+                  moneda="CRC"
+                />
+              </>
+            ) : null}
+          </span>
         </div>
       )}
 
       {/* ===== Observaciones del día (van impresas en el PDF) ===== */}
-      {!cargando && (
+      {modo === "dia" && !cargando && (
         <div className="obs-card">
           <div className="obs-head">
             <h3>
@@ -536,6 +716,7 @@ function MovimientoForm({
   const [cantidad, setCantidad] = useState(existente?.cantidad ?? 1);
   const [precio, setPrecio] = useState(existente?.precio_unitario || "");
   const [descuento, setDescuento] = useState(existente?.descuento ?? 0);
+  const [moneda, setMoneda] = useState(existente?.moneda || "USD");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
@@ -601,6 +782,7 @@ function MovimientoForm({
       cantidad: Number(cantidad),
       precio_unitario: precio,
       descuento: descuento === "" ? "0" : String(descuento),
+      moneda,
     };
     try {
       if (editando) {
@@ -610,7 +792,8 @@ function MovimientoForm({
       } else {
         const nuevo = await apiPost("/movimientos/", cuerpo);
         avisoExito(`Movimiento #${nuevo.numero} agregado`);
-        // Modal pegajoso: limpiamos para el siguiente, SIN cerrar.
+        // Modal pegajoso: limpiamos para el siguiente, SIN cerrar (la
+        // moneda queda, suele repetirse en la racha).
         setPersona("");
         setProducto("");
         setTipo("Venta");
@@ -671,6 +854,12 @@ function MovimientoForm({
             placeholder="Escribí el producto para buscar..."
           />
 
+          <label className="form-label">Moneda</label>
+          <select className="form-input" value={moneda} onChange={(e) => setMoneda(e.target.value)}>
+            <option value="USD">Dólares (USD)</option>
+            <option value="CRC">Colones (CRC)</option>
+          </select>
+
           <div className="fila-3">
             <div>
               <label className="form-label">Cantidad</label>
@@ -682,7 +871,7 @@ function MovimientoForm({
               />
             </div>
             <div>
-              <label className="form-label">Precio unit ($)</label>
+              <label className="form-label">Precio unit ({SIMBOLOS[moneda]})</label>
               <input
                 type="number" step="0.01" min="0" className="form-input"
                 value={precio}
@@ -691,7 +880,7 @@ function MovimientoForm({
               />
             </div>
             <div>
-              <label className="form-label">Descuento ($)</label>
+              <label className="form-label">Descuento ({SIMBOLOS[moneda]})</label>
               <input
                 type="number" step="0.01" min="0" className="form-input"
                 value={descuento}
@@ -700,12 +889,11 @@ function MovimientoForm({
             </div>
           </div>
 
-          {/* Totales calculados en vivo */}
+          {/* Totales calculados en vivo (en la moneda elegida) */}
           <div className={"totales-vivo" + (tipo === "Gasto" ? " es-gasto" : "")}>
-            <span>SubTotal: <b>{tipo === "Gasto" ? `($${fmt(subtotal)})` : `$${fmt(subtotal)}`}</b></span>
-            <span>Total: <b>{tipo === "Gasto" ? `($${fmt(subtotal)})` : `$${fmt(subtotal)}`}</b></span>
+            <span>SubTotal: <b>{tipo === "Gasto" ? `(${SIMBOLOS[moneda]}${fmt(subtotal)})` : `${SIMBOLOS[moneda]}${fmt(subtotal)}`}</b></span>
+            <span>Total: <b>{tipo === "Gasto" ? `(${SIMBOLOS[moneda]}${fmt(subtotal)})` : `${SIMBOLOS[moneda]}${fmt(subtotal)}`}</b></span>
           </div>
-
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>
               {editando ? "Cancelar" : "Cerrar"}

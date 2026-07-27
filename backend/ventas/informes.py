@@ -22,6 +22,9 @@ METODOS = ["Transferencia", "Efectivo", "Tarjeta", "Sinpe"]
 # El "monto" de un movimiento (cantidad × precio − descuento) calculado por la
 # base de datos. Es la misma fórmula del @property subtotal del modelo, pero
 # expresada para que Sum() pueda agregarla sin traer las filas a Python.
+# NO se convierte entre monedas (no se lleva tipo de cambio): USD y CRC se
+# agregan CADA UNO por su lado con un filtro Q(moneda=...) y se muestran
+# como dos totales separados, nunca mezclados en una sola suma.
 MONTO = ExpressionWrapper(
     F("cantidad") * F("precio_unitario") - F("descuento"),
     output_field=DecimalField(max_digits=14, decimal_places=2),
@@ -67,25 +70,40 @@ def _totales(desde, hasta):
         Movimiento.objects.filter(fecha__range=(desde, hasta))
         .annotate(monto=MONTO)
         .aggregate(
-            ventas=Sum("monto", filter=Q(tipo="Venta")),
-            gastos=Sum("monto", filter=Q(tipo="Gasto")),
+            ventas=Sum("monto", filter=Q(tipo="Venta", moneda="USD")),
+            gastos=Sum("monto", filter=Q(tipo="Gasto", moneda="USD")),
+            ventas_crc=Sum("monto", filter=Q(tipo="Venta", moneda="CRC")),
+            gastos_crc=Sum("monto", filter=Q(tipo="Gasto", moneda="CRC")),
             movimientos=Count("id"),
+            cantidad=Sum("cantidad"),
         )
     )
     ventas, gastos = _f(agg["ventas"]), _f(agg["gastos"])
+    ventas_crc, gastos_crc = _f(agg["ventas_crc"]), _f(agg["gastos_crc"])
     return {
         "ventas": ventas,
         "gastos": gastos,
         "neto": ventas - gastos,
+        # Lo mismo pero en colones: NUNCA se suma/resta contra los de arriba.
+        "ventas_crc": ventas_crc,
+        "gastos_crc": gastos_crc,
+        "neto_crc": ventas_crc - gastos_crc,
         "movimientos": agg["movimientos"],
+        # Unidades vendidas/gastadas (no confundir con "movimientos": un solo
+        # movimiento puede tener cantidad > 1). Cuenta ambas monedas juntas:
+        # es una cantidad de PRODUCTO, no un monto de dinero.
+        "cantidad": agg["cantidad"] or 0,
     }
 
 
 def _serie_evolucion(desde, hasta):
     """Ventas y gastos por día (rangos cortos) o por mes (rangos largos),
     SIN huecos: los días/meses sin movimientos aparecen en cero para que
-    el gráfico no 'salte' fechas."""
-    qs = Movimiento.objects.filter(fecha__range=(desde, hasta)).annotate(monto=MONTO)
+    el gráfico no 'salte' fechas.
+    Solo USD: un gráfico de línea no puede mostrar dos monedas sin sumarlas,
+    y no se convierte. Los montos en colones del período quedan en las
+    tarjetas de totales y en las tablas de método/categoría."""
+    qs = Movimiento.objects.filter(fecha__range=(desde, hasta), moneda="USD").annotate(monto=MONTO)
     por_dia = (hasta - desde).days + 1 <= MAX_DIAS_SERIE_DIARIA
 
     if por_dia:
@@ -130,9 +148,12 @@ def _por_metodo(desde, hasta):
         .annotate(monto=MONTO)
         .values("metodo")
         .annotate(
-            v=Sum("monto", filter=Q(tipo="Venta")),
-            g=Sum("monto", filter=Q(tipo="Gasto")),
+            v=Sum("monto", filter=Q(tipo="Venta", moneda="USD")),
+            g=Sum("monto", filter=Q(tipo="Gasto", moneda="USD")),
+            v_crc=Sum("monto", filter=Q(tipo="Venta", moneda="CRC")),
+            g_crc=Sum("monto", filter=Q(tipo="Gasto", moneda="CRC")),
             n=Count("id"),
+            cant=Sum("cantidad"),
         )
     )
     datos = {fila["metodo"]: fila for fila in filas}
@@ -140,12 +161,17 @@ def _por_metodo(desde, hasta):
     for metodo in METODOS:  # orden FIJO: los colores del gráfico no deben bailar
         fila = datos.get(metodo, {})
         ventas, gastos = _f(fila.get("v")), _f(fila.get("g"))
+        ventas_crc, gastos_crc = _f(fila.get("v_crc")), _f(fila.get("g_crc"))
         resultado.append({
             "metodo": metodo,
             "ventas": ventas,
             "gastos": gastos,
             "neto": ventas - gastos,
+            "ventas_crc": ventas_crc,
+            "gastos_crc": gastos_crc,
+            "neto_crc": ventas_crc - gastos_crc,
             "movimientos": fila.get("n", 0),
+            "cantidad": fila.get("cant") or 0,
         })
     return resultado
 
@@ -156,9 +182,12 @@ def _por_categoria(desde, hasta):
         .annotate(monto=MONTO)
         .values("producto__categoria__nombre")
         .annotate(
-            v=Sum("monto", filter=Q(tipo="Venta")),
-            g=Sum("monto", filter=Q(tipo="Gasto")),
+            v=Sum("monto", filter=Q(tipo="Venta", moneda="USD")),
+            g=Sum("monto", filter=Q(tipo="Gasto", moneda="USD")),
+            v_crc=Sum("monto", filter=Q(tipo="Venta", moneda="CRC")),
+            g_crc=Sum("monto", filter=Q(tipo="Gasto", moneda="CRC")),
             n=Count("id"),
+            cant=Sum("cantidad"),
         )
     )
     resultado = [
@@ -167,7 +196,14 @@ def _por_categoria(desde, hasta):
             "ventas": _f(fila["v"]),
             "gastos": _f(fila["g"]),
             "neto": _f(fila["v"]) - _f(fila["g"]),
+            "ventas_crc": _f(fila["v_crc"]),
+            "gastos_crc": _f(fila["g_crc"]),
+            "neto_crc": _f(fila["v_crc"]) - _f(fila["g_crc"]),
             "movimientos": fila["n"],
+            # Unidades de producto vendidas/gastadas en la categoría (un
+            # movimiento con cantidad=10 suma 10, no 1: evita confundir al
+            # usuario con el número de renglones registrados).
+            "cantidad": fila["cant"] or 0,
         }
         for fila in filas
     ]
@@ -182,6 +218,10 @@ def calcular_informe(desde, hasta):
     return {
         "desde": desde.isoformat(),
         "hasta": hasta.isoformat(),
+        # El frontend/PDF solo muestran las columnas/tarjetas de colones
+        # cuando de verdad hay movimientos en CRC en el período: si el
+        # negocio solo usa dólares, no hay que ensuciarle la pantalla.
+        "hay_crc": Movimiento.objects.filter(fecha__range=(desde, hasta), moneda="CRC").exists(),
         "totales": _totales(desde, hasta),
         "anterior": {
             "desde": ant_desde.isoformat(),

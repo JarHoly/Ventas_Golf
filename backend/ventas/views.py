@@ -75,8 +75,10 @@ class ProductoViewSet(BorradoProtegidoMixin, viewsets.ModelViewSet):
 
 class MovimientoViewSet(viewsets.ModelViewSet):
     """
-    CRUD de movimientos. Se usa siempre filtrado por día:
+    CRUD de movimientos. Se usa filtrado por día:
       GET /api/movimientos/?fecha=2026-07-17
+    o por rango de fechas (para la vista de "Rango de fechas", solo lectura):
+      GET /api/movimientos/?desde=2026-07-01&hasta=2026-07-17
     Reglas:
       - Si el día está cerrado (TERMINAR EL DÍA), no se puede crear/editar/borrar.
       - Al borrar, se recalculan los consecutivos del día (1, 2, 3...).
@@ -86,9 +88,13 @@ class MovimientoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Movimiento.objects.select_related("persona", "producto").all()
         fecha = self.request.query_params.get("fecha")
+        desde = self.request.query_params.get("desde")
+        hasta = self.request.query_params.get("hasta")
         if fecha:
             # El día se lista en orden de registro: #1, #2, #3...
             qs = qs.filter(fecha=fecha).order_by("numero")
+        elif desde and hasta:
+            qs = qs.filter(fecha__range=(desde, hasta)).order_by("-fecha", "-numero")
         return qs
 
     def perform_create(self, serializer):

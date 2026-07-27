@@ -42,7 +42,7 @@ class MovimientoSerializer(serializers.ModelSerializer):
             "id", "numero", "fecha", "tipo", "metodo",
             "persona", "persona_nombre", "persona_tipo",
             "producto", "producto_nombre", "categoria_id",
-            "cantidad", "precio_unitario", "descuento",
+            "cantidad", "precio_unitario", "descuento", "moneda",
             "subtotal", "total", "creado_en",
         ]
         read_only_fields = ["id", "numero", "creado_en"]

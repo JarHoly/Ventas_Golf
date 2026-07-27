@@ -141,6 +141,14 @@
   font-weight: 500;
 }
 
+/* Monto en colones bajo la variación: informativo, no se convierte a USD. */
+.inf-card-crc {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #132f63;
+}
+
 /* ---- Cajas de gráficos ---- */
 .inf-charts {
   display: grid;

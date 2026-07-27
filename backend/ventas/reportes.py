@@ -6,6 +6,7 @@ observaciones y pie de página con numeración.
 """
 import io
 from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from django.http import HttpResponse
@@ -30,8 +31,8 @@ from xml.sax.saxutils import escape
 
 from django.utils import timezone
 
-from .models import Movimiento, CierreDia, ObservacionDia
-from .informes import calcular_informe, validar_rango, solo_personal_negocio
+from .models import Movimiento, CierreDia, ObservacionDia, Persona, Producto, Categoria
+from .informes import calcular_informe, validar_rango, solo_personal_negocio, MAX_DIAS_SERIE_DIARIA
 
 EMPRESA = "E Cuestas CORP AMERICA C.R. S.A."
 
@@ -64,6 +65,20 @@ def _fmt(valor, negativo=False):
     """1500 -> '1,500.00' · negativo (por bandera O por signo) -> '(1,500.00)'."""
     texto = f"{abs(valor):,.2f}"
     return f"({texto})" if (negativo or valor < 0) else texto
+
+
+SIMBOLO_MONEDA = {"USD": "$", "CRC": "₡"}
+
+
+def _fmt_moneda(valor, moneda, negativo=False):
+    """Igual que _fmt pero con el símbolo de la moneda del movimiento."""
+    return f"{SIMBOLO_MONEDA.get(moneda, '$')}{_fmt(valor, negativo)}"
+
+
+def _sub_usd_crc(valor_crc, negativo=False):
+    """Para la 2da línea de una tarjeta: 'USD' si no hubo movimientos en
+    colones, o '+ ₡X CRC' si sí (nunca se convierte/mezcla con el USD)."""
+    return f"+ {_fmt_moneda(valor_crc, 'CRC', negativo)}" if valor_crc else "USD"
 
 
 def _p(texto, tam=8, color=colors.black, negrita=False, italica=False, alin=0, leading=None):
@@ -162,9 +177,10 @@ def _grafico_evolucion(ancho, alto, fecha_reporte):
         x += 10 + 5.5 * 0.55 * len(metodo) + 12
 
     # Neto por método de cada uno de los últimos días (una sola consulta).
+    # Solo USD: sin tipo de cambio no se puede sumar colones en la misma línea.
     dias = [fecha_reporte - timedelta(days=i) for i in range(DIAS_GRAFICO - 1, -1, -1)]
     neto = {m: {dia: 0.0 for dia in dias} for m in METODOS}
-    consulta = Movimiento.objects.filter(fecha__range=(dias[0], dias[-1]))
+    consulta = Movimiento.objects.filter(fecha__range=(dias[0], dias[-1]), moneda="USD")
     for mov in consulta:
         monto = float(mov.total) if mov.tipo == "Venta" else -float(mov.total)
         neto[mov.metodo][mov.fecha] += monto
@@ -226,15 +242,37 @@ def pdf_resumen_dia(request, fecha):
     )
 
     # ---------- Cálculos ----------
+    # NO se convierte entre monedas (no se lleva tipo de cambio): dólares y
+    # colones se suman CADA UNO por su lado. El gráfico de evolución y la
+    # dona de distribución por método son visualizaciones de UN solo total,
+    # así que se calculan solo con los movimientos en USD (el detalle de
+    # abajo sí muestra cada fila en colones si corresponde).
     total_cantidad = sum(m.cantidad for m in movimientos)
-    total_ventas = sum(m.total for m in movimientos if m.tipo == "Venta")
-    total_gastos = sum(m.total for m in movimientos if m.tipo == "Gasto")
-    neto_subtotal = sum(m.subtotal if m.tipo == "Venta" else -m.subtotal for m in movimientos)
-    neto_total = total_ventas - total_gastos
 
-    # Neto por método (ventas suman, gastos restan) — como el reporte de la empresa.
+    def _suma(tipo, moneda):
+        return sum(m.total for m in movimientos if m.tipo == tipo and m.moneda == moneda)
+
+    total_ventas = _suma("Venta", "USD")
+    total_gastos = _suma("Gasto", "USD")
+    total_ventas_crc = _suma("Venta", "CRC")
+    total_gastos_crc = _suma("Gasto", "CRC")
+    neto_subtotal = sum(
+        m.subtotal if m.tipo == "Venta" else -m.subtotal
+        for m in movimientos if m.moneda == "USD"
+    )
+    neto_subtotal_crc = sum(
+        m.subtotal if m.tipo == "Venta" else -m.subtotal
+        for m in movimientos if m.moneda == "CRC"
+    )
+    neto_total = total_ventas - total_gastos
+    neto_total_crc = total_ventas_crc - total_gastos_crc
+
+    # Neto por método (ventas suman, gastos restan) — como el reporte de la
+    # empresa. Solo USD: ver nota arriba.
     neto_por_metodo = {m: 0 for m in METODOS}
     for m in movimientos:
+        if m.moneda != "USD":
+            continue
         neto_por_metodo[m.metodo] += m.total if m.tipo == "Venta" else -m.total
 
     # ---------- Documento ----------
@@ -306,9 +344,10 @@ def pdf_resumen_dia(request, fecha):
     tarjetas = Table(
         [
             [_tarjeta(ancho_tarjeta, "TOTAL MOVIMIENTOS", str(len(movimientos)), "Transacciones", NAVY, "#"),
-             _tarjeta(ancho_tarjeta, "VENTAS TOTALES", _fmt(total_ventas), "USD", VERDE, "+")],
-            [_tarjeta(ancho_tarjeta, "GASTOS TOTALES", _fmt(total_gastos), "USD", ROJO, "-"),
-             _tarjeta(ancho_tarjeta, "TOTAL GENERAL", _fmt(neto_total), "USD", MORADO, "$")],
+             _tarjeta(ancho_tarjeta, "VENTAS TOTALES", _fmt(total_ventas), _sub_usd_crc(total_ventas_crc), VERDE, "+")],
+            [_tarjeta(ancho_tarjeta, "GASTOS TOTALES", _fmt(total_gastos), _sub_usd_crc(total_gastos_crc), ROJO, "-"),
+             _tarjeta(ancho_tarjeta, "TOTAL GENERAL", _fmt(neto_total, neto_total < 0),
+                      _sub_usd_crc(neto_total_crc, neto_total_crc < 0), MORADO, "$")],
         ],
         colWidths=[ancho_tarjetas / 2] * 2,
     )
@@ -365,16 +404,26 @@ def pdf_resumen_dia(request, fecha):
             str(m.numero), _p(escape(m.persona.nombre), 7.5, leading=8.5),
             m.persona.tipo, m.tipo, _p(escape(m.producto.nombre), 7.5, leading=8.5),
             m.metodo, str(m.cantidad),
-            _fmt(m.precio_unitario, es_gasto), _fmt(m.descuento),
-            _fmt(m.subtotal, es_gasto), _fmt(0), _fmt(m.total, es_gasto),
+            _fmt_moneda(m.precio_unitario, m.moneda, es_gasto), _fmt_moneda(m.descuento, m.moneda),
+            _fmt_moneda(m.subtotal, m.moneda, es_gasto), _fmt(0),
+            _fmt_moneda(m.total, m.moneda, es_gasto),
         ])
         if es_gasto:
             for col in (7, 9, 11):
                 estilos_filas.append(("TEXTCOLOR", (col, idx), (col, idx), ROJO))
 
+    def _celda_totales(usd_val, crc_val, negativo_usd, negativo_crc):
+        """La fila TOTALES no convierte: si hubo movimientos en las dos
+        monedas, muestra las dos líneas (USD y CRC) en la misma celda."""
+        lineas = [_fmt_moneda(usd_val, "USD", negativo_usd)]
+        if crc_val:
+            lineas.append(_fmt_moneda(crc_val, "CRC", negativo_crc))
+        return _p("<br/>".join(lineas), 7.5, colors.white, negrita=True, alin=2, leading=9)
+
     datos.append(["TOTALES", "", "", "", "", "", str(total_cantidad), "", "",
-                  _fmt(neto_subtotal, neto_subtotal < 0), _fmt(0),
-                  _fmt(neto_total, neto_total < 0)])
+                  _celda_totales(neto_subtotal, neto_subtotal_crc, neto_subtotal < 0, neto_subtotal_crc < 0),
+                  _fmt(0),
+                  _celda_totales(neto_total, neto_total_crc, neto_total < 0, neto_total_crc < 0)])
 
     anchos = [0.03, 0.14, 0.07, 0.08, 0.15, 0.08, 0.06, 0.08, 0.08, 0.09, 0.06, 0.08]
     tabla = Table(datos, colWidths=[W * a for a in anchos], repeatRows=1)
@@ -434,7 +483,7 @@ def pdf_resumen_dia(request, fecha):
     ancho_dist = W * 0.48 - 6
     # Misma altura EXACTA que la caja de observaciones (18 + 5x24 = 138)
     caja_dist = Table(
-        [[_p("DISTRIBUCIÓN POR MÉTODO DE PAGO", 8.5, NAVY, negrita=True), ""],
+        [[_p("DISTRIBUCIÓN POR MÉTODO DE PAGO (USD)", 8.5, NAVY, negrita=True), ""],
          [_dona_metodos(neto_por_metodo), leyenda]],
         colWidths=[110, ancho_dist - 110],
         rowHeights=[20, 118],
@@ -508,11 +557,12 @@ def pdf_resumen_dia(request, fecha):
     elementos.append(tabla)
 
     # Marcador de integridad: si falta la última hoja, se nota de inmediato.
+    texto_pie = f"— Fin del detalle · {len(movimientos)} movimientos · Total {_fmt_moneda(neto_total, 'USD', neto_total < 0)}"
+    if neto_total_crc:
+        texto_pie += f" · {_fmt_moneda(neto_total_crc, 'CRC', neto_total_crc < 0)}"
+    texto_pie += " —"
     elementos.append(Spacer(1, 3 * mm))
-    elementos.append(_p(
-        f"— Fin del detalle · {len(movimientos)} movimientos · Total {_fmt(neto_total, neto_total < 0)} USD —",
-        7.5, GRIS, italica=True, alin=1,
-    ))
+    elementos.append(_p(texto_pie, 7.5, GRIS, italica=True, alin=1))
 
     doc.build(elementos, canvasmaker=_CanvasNumerado)
     buffer.seek(0)
@@ -646,15 +696,22 @@ def pdf_informe(request):
     elementos.append(Spacer(1, 4 * mm))
 
     # ============ TARJETAS (con comparativa vs período anterior) ============
+    # No se convierte entre monedas: si hubo movimientos en colones en el
+    # período, se agrega esa cifra a la línea de abajo, junto a la variación.
+    def _sub_con_crc(variacion_txt, valor_crc, negativo_crc=False):
+        if not valor_crc:
+            return variacion_txt
+        return f"{variacion_txt} · + {_fmt_moneda(valor_crc, 'CRC', negativo_crc)}"
+
     ancho_tarjeta = W / 4 - 6
     fila_tarjetas = Table(
         [[
             _tarjeta(ancho_tarjeta, "VENTAS TOTALES", _fmt(tot["ventas"]),
-                     _variacion(tot["ventas"], ant["ventas"]), VERDE, "+"),
+                     _sub_con_crc(_variacion(tot["ventas"], ant["ventas"]), tot["ventas_crc"]), VERDE, "+"),
             _tarjeta(ancho_tarjeta, "GASTOS TOTALES", _fmt(tot["gastos"]),
-                     _variacion(tot["gastos"], ant["gastos"]), ROJO, "-"),
+                     _sub_con_crc(_variacion(tot["gastos"], ant["gastos"]), tot["gastos_crc"]), ROJO, "-"),
             _tarjeta(ancho_tarjeta, "RESULTADO NETO", _fmt(tot["neto"], tot["neto"] < 0),
-                     _variacion(tot["neto"], ant["neto"]),
+                     _sub_con_crc(_variacion(tot["neto"], ant["neto"]), tot["neto_crc"], tot["neto_crc"] < 0),
                      ROJO if tot["neto"] < 0 else MORADO, "$"),
             _tarjeta(ancho_tarjeta, "MOVIMIENTOS", str(tot["movimientos"]),
                      _variacion(tot["movimientos"], ant["movimientos"]), NAVY, "#"),
@@ -714,7 +771,7 @@ def pdf_informe(request):
 
     ancho_dist = W * 0.40 - 6
     caja_dist = Table(
-        [[_p("DISTRIBUCIÓN POR MÉTODO DE PAGO (NETO)", 8, NAVY, negrita=True), ""],
+        [[_p("DISTRIBUCIÓN POR MÉTODO DE PAGO (NETO, USD)", 8, NAVY, negrita=True), ""],
          [_dona_metodos(neto_por_metodo), leyenda]],
         colWidths=[105, ancho_dist - 105],
         rowHeights=[20, 128],
@@ -747,27 +804,48 @@ def pdf_informe(request):
     ]))
     elementos.append(banda)
 
-    datos = [["Categoría", "Movimientos", "Ventas", "Gastos", "Neto"]]
+    # Las columnas en colones solo se muestran si de verdad hubo movimientos
+    # en CRC en el período (si el negocio solo usa dólares, no hay que
+    # ensuciarle la tabla con columnas en cero).
+    hay_crc = informe["hay_crc"]
+    cabeceras_cat = ["Categoría", "Cantidad", "Ventas ($)", "Gastos ($)", "Neto ($)"]
+    if hay_crc:
+        cabeceras_cat += ["Ventas (₡)", "Gastos (₡)", "Neto (₡)"]
+    datos = [cabeceras_cat]
     estilos_filas = []
     for idx, c in enumerate(informe["por_categoria"], start=1):
-        datos.append([
-            _p(escape(c["categoria"]), 8, leading=9.5), str(c["movimientos"]),
+        fila = [
+            _p(escape(c["categoria"]), 8, leading=9.5), str(c["cantidad"]),
             _fmt(c["ventas"]), _fmt(c["gastos"], c["gastos"] > 0),
             _fmt(c["neto"], c["neto"] < 0),
-        ])
+        ]
         if c["gastos"] > 0:
             estilos_filas.append(("TEXTCOLOR", (3, idx), (3, idx), ROJO))
         if c["neto"] < 0:
             estilos_filas.append(("TEXTCOLOR", (4, idx), (4, idx), ROJO))
+        if hay_crc:
+            fila += [
+                _fmt(c["ventas_crc"]), _fmt(c["gastos_crc"], c["gastos_crc"] > 0),
+                _fmt(c["neto_crc"], c["neto_crc"] < 0),
+            ]
+            if c["gastos_crc"] > 0:
+                estilos_filas.append(("TEXTCOLOR", (6, idx), (6, idx), ROJO))
+            if c["neto_crc"] < 0:
+                estilos_filas.append(("TEXTCOLOR", (7, idx), (7, idx), ROJO))
+        datos.append(fila)
     if not informe["por_categoria"]:
-        datos.append(["Sin movimientos en el período", "", "", "", ""])
-    datos.append(["TOTALES", str(tot["movimientos"]), _fmt(tot["ventas"]),
-                  _fmt(tot["gastos"], tot["gastos"] > 0),
-                  _fmt(tot["neto"], tot["neto"] < 0)])
+        datos.append(["Sin movimientos en el período"] + [""] * (len(cabeceras_cat) - 1))
+    fila_totales = ["TOTALES", str(tot["cantidad"]), _fmt(tot["ventas"]),
+                    _fmt(tot["gastos"], tot["gastos"] > 0),
+                    _fmt(tot["neto"], tot["neto"] < 0)]
+    if hay_crc:
+        fila_totales += [_fmt(tot["ventas_crc"]), _fmt(tot["gastos_crc"], tot["gastos_crc"] > 0),
+                          _fmt(tot["neto_crc"], tot["neto_crc"] < 0)]
+    datos.append(fila_totales)
 
     fila_total = len(datos) - 1
-    tabla = Table(datos, colWidths=[W * a for a in (0.36, 0.14, 0.17, 0.17, 0.16)],
-                  repeatRows=1)
+    anchos_cat = (0.22, 0.09, 0.11, 0.11, 0.10, 0.12, 0.12, 0.13) if hay_crc else (0.36, 0.14, 0.17, 0.17, 0.16)
+    tabla = Table(datos, colWidths=[W * a for a in anchos_cat], repeatRows=1)
     tabla.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), NAVY),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -788,12 +866,15 @@ def pdf_informe(request):
     ]))
     elementos.append(tabla)
 
-    elementos.append(Spacer(1, 3 * mm))
-    elementos.append(_p(
+    texto_pie_informe = (
         f"— Informe del {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')} · "
-        f"{tot['movimientos']} movimientos · Neto {_fmt(tot['neto'], tot['neto'] < 0)} USD —",
-        7.5, GRIS, italica=True, alin=1,
-    ))
+        f"{tot['movimientos']} movimientos · Neto {_fmt_moneda(tot['neto'], 'USD', tot['neto'] < 0)}"
+    )
+    if hay_crc:
+        texto_pie_informe += f" · {_fmt_moneda(tot['neto_crc'], 'CRC', tot['neto_crc'] < 0)}"
+    texto_pie_informe += " —"
+    elementos.append(Spacer(1, 3 * mm))
+    elementos.append(_p(texto_pie_informe, 7.5, GRIS, italica=True, alin=1))
 
     doc.build(elementos, canvasmaker=_CanvasNumerado)
     buffer.seek(0)
@@ -802,4 +883,389 @@ def pdf_informe(request):
     respuesta["Content-Disposition"] = (
         f'inline; filename="Informe_{informe["desde"]}_{informe["hasta"]}.pdf"'
     )
+    return respuesta
+
+
+# ======================================================================
+# DETALLE DE MOVIMIENTOS POR RANGO DE FECHAS (con los mismos filtros que la
+# pantalla de Movimientos). A diferencia del resumen diario, NO exige que
+# los días estén cerrados: es un reporte de consulta/exportación, no el
+# cierre oficial del día.
+# ======================================================================
+
+def _decimal_o_none(texto):
+    if not texto:
+        return None
+    try:
+        return Decimal(texto)
+    except InvalidOperation:
+        return None
+
+
+def _movimientos_filtrados(request):
+    """Aplica a la queryset los mismos filtros del panel de Movimientos:
+    persona, producto, método, categoría y monto (mín/máx, en la moneda
+    propia de cada movimiento — no se convierte)."""
+    qp = request.query_params
+    qs = (
+        Movimiento.objects.filter(fecha__range=(qp.get("desde"), qp.get("hasta")))
+        .select_related("persona", "producto")
+        .order_by("fecha", "numero")
+    )
+    if qp.get("persona"):
+        qs = qs.filter(persona_id=qp["persona"])
+    if qp.get("producto"):
+        qs = qs.filter(producto_id=qp["producto"])
+    if qp.get("metodo"):
+        qs = qs.filter(metodo=qp["metodo"])
+    if qp.get("categoria"):
+        qs = qs.filter(producto__categoria_id=qp["categoria"])
+
+    monto_min = _decimal_o_none(qp.get("monto_min"))
+    monto_max = _decimal_o_none(qp.get("monto_max"))
+    movimientos = list(qs)
+    if monto_min is not None:
+        movimientos = [m for m in movimientos if m.total >= monto_min]
+    if monto_max is not None:
+        movimientos = [m for m in movimientos if m.total <= monto_max]
+    return movimientos
+
+
+def _serie_desde_movimientos(movimientos, desde, hasta):
+    """Igual que informes._serie_evolucion, pero a partir de una lista de
+    movimientos YA FILTRADA en Python (los filtros del panel no son solo de
+    fecha, así que no se puede volver a consultar la BD desde cero).
+    Solo USD, por la misma razón que en el resto del reporte: un gráfico de
+    línea no puede mostrar dos monedas sin sumarlas, y no se convierte."""
+    por_dia = (hasta - desde).days + 1 <= MAX_DIAS_SERIE_DIARIA
+    agregados = {}
+    for m in movimientos:
+        if m.moneda != "USD":
+            continue
+        clave = m.fecha if por_dia else date(m.fecha.year, m.fecha.month, 1)
+        fila = agregados.setdefault(clave, {"ventas": 0.0, "gastos": 0.0})
+        monto = float(m.total)
+        fila["ventas" if m.tipo == "Venta" else "gastos"] += monto
+
+    puntos = []
+    if por_dia:
+        dia = desde
+        while dia <= hasta:
+            fila = agregados.get(dia, {"ventas": 0.0, "gastos": 0.0})
+            puntos.append({"etiqueta": dia.strftime("%d/%m"), **fila})
+            dia += timedelta(days=1)
+    else:
+        mes = date(desde.year, desde.month, 1)
+        while mes <= hasta:
+            fila = agregados.get(mes, {"ventas": 0.0, "gastos": 0.0})
+            puntos.append({"etiqueta": mes.strftime("%m/%Y"), **fila})
+            mes = date(mes.year + mes.month // 12, mes.month % 12 + 1, 1)
+    return puntos, ("dia" if por_dia else "mes")
+
+
+def _resumen_filtros(request):
+    """Texto legible de los filtros activos, para dejar constancia en el PDF
+    de exactamente qué se filtró (mismos filtros del panel de Movimientos)."""
+    qp = request.query_params
+    partes = []
+    if qp.get("persona"):
+        p = Persona.objects.filter(id=qp["persona"]).first()
+        if p:
+            partes.append(f"Persona: {p.codigo} · {p.nombre}")
+    if qp.get("producto"):
+        p = Producto.objects.filter(id=qp["producto"]).first()
+        if p:
+            partes.append(f"Producto: {p.nombre}")
+    if qp.get("metodo"):
+        partes.append(f"Método: {qp['metodo']}")
+    if qp.get("categoria"):
+        c = Categoria.objects.filter(id=qp["categoria"]).first()
+        if c:
+            partes.append(f"Categoría: {c.nombre}")
+    if qp.get("monto_min"):
+        partes.append(f"Monto mín: {qp['monto_min']}")
+    if qp.get("monto_max"):
+        partes.append(f"Monto máx: {qp['monto_max']}")
+    return partes
+
+
+@api_view(["GET"])
+def pdf_rango_movimientos(request):
+    """GET /api/reportes/rango/pdf/?desde=&hasta=&persona=&producto=&metodo=&categoria=&monto_min=&monto_max=
+    PDF de movimientos para un rango de fechas con filtros — mismo diseño
+    dashboard que el resumen diario (tarjetas, gráfico, dona) más el
+    detalle, pero sin exigir que los días estén cerrados."""
+    rango, error = validar_rango(request)
+    if error:
+        return error
+    desde, hasta = rango
+    movimientos = _movimientos_filtrados(request)
+
+    total_cantidad = sum(m.cantidad for m in movimientos)
+
+    def _suma(tipo, moneda):
+        return sum(m.total for m in movimientos if m.tipo == tipo and m.moneda == moneda)
+
+    ventas_usd, gastos_usd = _suma("Venta", "USD"), _suma("Gasto", "USD")
+    ventas_crc, gastos_crc = _suma("Venta", "CRC"), _suma("Gasto", "CRC")
+    neto_usd = ventas_usd - gastos_usd
+    neto_crc = ventas_crc - gastos_crc
+
+    # Neto por método (solo USD, igual que en el resumen diario y el informe).
+    neto_por_metodo = {m: 0 for m in METODOS}
+    for mv in movimientos:
+        if mv.moneda != "USD":
+            continue
+        neto_por_metodo[mv.metodo] += mv.total if mv.tipo == "Venta" else -mv.total
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=8 * mm, rightMargin=8 * mm,
+        topMargin=8 * mm, bottomMargin=14 * mm,
+        title=f"Movimientos {desde} a {hasta}",
+    )
+    W = doc.width
+    elementos = []
+
+    # ============ ENCABEZADO ============
+    titulo_textos = Table(
+        [[_p("DETALLE DE", 12, colors.white, negrita=True, leading=13)],
+         [_p("MOVIMIENTOS (RANGO)", 15, AZUL_CLARO, negrita=True, leading=16)]],
+        colWidths=[W * 0.40 - 44],
+    )
+    titulo_textos.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+    ]))
+    banner = Table([[_icono_titulo(), titulo_textos]], colWidths=[40, W * 0.40 - 40])
+    banner.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+        ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (0, 0), 8),
+    ]))
+    bloque_empresa = Table(
+        [[_p(EMPRESA, 12, NAVY, negrita=True)],
+         [_p("Cada movimiento se muestra en su propia moneda (no se convierte)", 8, GRIS, italica=True)]],
+        colWidths=[W * 0.38],
+    )
+    bloque_empresa.setStyle(TableStyle([("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
+    bloque_periodo = Table(
+        [[_p("PERÍODO:", 8, NAVY, negrita=True, alin=2)],
+         [_p(f"{desde.strftime('%d/%m/%Y')} – {hasta.strftime('%d/%m/%Y')}", 13, NAVY,
+             negrita=True, alin=2)]],
+        colWidths=[W * 0.22],
+    )
+    bloque_periodo.setStyle(TableStyle([("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
+    encabezado = Table(
+        [[banner, bloque_empresa, bloque_periodo]],
+        colWidths=[W * 0.40, W * 0.38, W * 0.22],
+    )
+    encabezado.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (0, 0), 0),
+        ("RIGHTPADDING", (-1, 0), (-1, 0), 0),
+    ]))
+    elementos.append(encabezado)
+    elementos.append(Spacer(1, 4 * mm))
+
+    # ============ TARJETAS + GRÁFICO ============
+    ancho_tarjetas = W * 0.62
+    ancho_tarjeta = ancho_tarjetas / 2 - 6
+    tarjetas = Table(
+        [
+            [_tarjeta(ancho_tarjeta, "TOTAL MOVIMIENTOS", str(len(movimientos)), "Transacciones", NAVY, "#"),
+             _tarjeta(ancho_tarjeta, "VENTAS TOTALES", _fmt(ventas_usd), _sub_usd_crc(ventas_crc), VERDE, "+")],
+            [_tarjeta(ancho_tarjeta, "GASTOS TOTALES", _fmt(gastos_usd), _sub_usd_crc(gastos_crc), ROJO, "-"),
+             _tarjeta(ancho_tarjeta, "TOTAL GENERAL", _fmt(neto_usd, neto_usd < 0),
+                      _sub_usd_crc(neto_crc, neto_crc < 0), MORADO, "$")],
+        ],
+        colWidths=[ancho_tarjetas / 2] * 2,
+    )
+    tarjetas.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+        ("BOTTOMPADDING", (0, 1), (-1, 1), 0),
+    ]))
+
+    puntos, agrupacion = _serie_desde_movimientos(movimientos, desde, hasta)
+    etiqueta_serie = "POR DÍA" if agrupacion == "dia" else "POR MES"
+    ancho_grafico = W * 0.38 - 6
+    caja_grafico = Table(
+        [[_p(f"EVOLUCIÓN DE VENTAS Y GASTOS {etiqueta_serie} (USD)", 7.5, NAVY, negrita=True)],
+         [_grafico_ventas_gastos(ancho_grafico - 12, 78, puntos)]],
+        colWidths=[ancho_grafico],
+    )
+    caja_grafico.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
+        ("ROUNDEDCORNERS", [5, 5, 5, 5]),
+        ("TOPPADDING", (0, 0), (0, 0), 6),
+        ("BOTTOMPADDING", (0, -1), (0, -1), 4),
+    ]))
+
+    fila_media = Table([[tarjetas, caja_grafico]], colWidths=[W * 0.62, W * 0.38])
+    fila_media.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    elementos.append(fila_media)
+    elementos.append(Spacer(1, 4 * mm))
+
+    # ============ DISTRIBUCIÓN POR MÉTODO + FILTROS APLICADOS ============
+    movido_total = sum(abs(v) for v in neto_por_metodo.values())
+    filas_leyenda = []
+    for m in METODOS:
+        v = neto_por_metodo[m]
+        pct = (abs(float(v)) / float(movido_total) * 100) if movido_total else 0
+        cuadro = Drawing(8, 8)
+        cuadro.add(Rect(0, 0, 8, 8, fillColor=COLOR_METODO[m], strokeColor=None))
+        filas_leyenda.append([
+            cuadro, _p(m, 8),
+            _p(_fmt(v), 8, ROJO if v < 0 else colors.black, alin=2),
+            _p(f"{pct:.2f}%", 8, ROJO if v < 0 else NAVY, negrita=True, alin=2),
+        ])
+    filas_leyenda.append([
+        "", _p("TOTAL", 8, negrita=True),
+        _p(_fmt(neto_usd, neto_usd < 0), 8, negrita=True, alin=2),
+        _p("100.00%" if movido_total else "0.00%", 8, NAVY, negrita=True, alin=2),
+    ])
+    leyenda = Table(filas_leyenda, colWidths=[14, 70, 62, 48])
+    leyenda.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ("LINEABOVE", (0, -1), (-1, -1), 0.6, BORDE),
+    ]))
+
+    ancho_dist = W * 0.48 - 6
+    caja_dist = Table(
+        [[_p("DISTRIBUCIÓN POR MÉTODO DE PAGO (USD)", 8.5, NAVY, negrita=True), ""],
+         [_dona_metodos(neto_por_metodo), leyenda]],
+        colWidths=[110, ancho_dist - 110],
+        rowHeights=[20, 118],
+    )
+    caja_dist.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
+        ("ROUNDEDCORNERS", [5, 5, 5, 5]),
+        ("SPAN", (0, 0), (1, 0)),
+        ("VALIGN", (0, 1), (-1, 1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, 0), 7),
+    ]))
+
+    ancho_filtros = W * 0.52 - 6
+    filtros_activos = _resumen_filtros(request)
+    filas_filtros = [[_p("FILTROS APLICADOS", 8.5, NAVY, negrita=True)]]
+    if filtros_activos:
+        for texto in filtros_activos:
+            filas_filtros.append([_p(escape(texto), 8, leading=11)])
+        while len(filas_filtros) < 6:
+            filas_filtros.append([""])
+    else:
+        filas_filtros.append([_p("Ninguno — se incluyen todos los movimientos del período.", 8, GRIS, italica=True)])
+        filas_filtros += [[""] for _ in range(4)]
+    caja_filtros = Table(filas_filtros, colWidths=[ancho_filtros], rowHeights=[18] + [24] * 5)
+    caja_filtros.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
+        ("ROUNDEDCORNERS", [5, 5, 5, 5]),
+        ("TOPPADDING", (0, 0), (0, 0), 6),
+        ("TOPPADDING", (0, 1), (0, -1), 3),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+    ]))
+
+    fila_inferior = Table([[caja_dist, caja_filtros]], colWidths=[W * 0.48, W * 0.52])
+    fila_inferior.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (0, 0), 6),
+        ("RIGHTPADDING", (-1, 0), (-1, 0), 0),
+    ]))
+    elementos.append(fila_inferior)
+    elementos.append(Spacer(1, 4 * mm))
+
+    # ============ TABLA DE DETALLE ============
+    banda = Table([[_p("DETALLE DE MOVIMIENTOS", 9, colors.white, negrita=True, alin=1)]],
+                  colWidths=[W])
+    banda.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    elementos.append(banda)
+
+    cabeceras = ["#", "Fecha", "Cliente / Proveedor", "Tipo", "Movimiento", "Producto",
+                 "Método", "Cantidad", "Precio Unit", "Descuento", "SubTotal", "Total"]
+    datos = [cabeceras]
+    estilos_filas = []
+    for idx, m in enumerate(movimientos, start=1):
+        es_gasto = m.tipo == "Gasto"
+        datos.append([
+            str(m.numero), m.fecha.strftime("%d/%m/%Y"),
+            _p(escape(m.persona.nombre), 7.5, leading=8.5),
+            m.persona.tipo, m.tipo, _p(escape(m.producto.nombre), 7.5, leading=8.5),
+            m.metodo, str(m.cantidad),
+            _fmt_moneda(m.precio_unitario, m.moneda, es_gasto), _fmt_moneda(m.descuento, m.moneda),
+            _fmt_moneda(m.subtotal, m.moneda, es_gasto), _fmt_moneda(m.total, m.moneda, es_gasto),
+        ])
+        if es_gasto:
+            for col in (8, 10, 11):
+                estilos_filas.append(("TEXTCOLOR", (col, idx), (col, idx), ROJO))
+
+    def _celda_totales(usd_val, crc_val, negativo_usd, negativo_crc):
+        lineas = [_fmt_moneda(usd_val, "USD", negativo_usd)]
+        if crc_val:
+            lineas.append(_fmt_moneda(crc_val, "CRC", negativo_crc))
+        return _p("<br/>".join(lineas), 7.5, colors.white, negrita=True, alin=2, leading=9)
+
+    if not movimientos:
+        datos.append(["Ningún movimiento coincide con el rango y los filtros elegidos."] + [""] * 11)
+    datos.append(["TOTALES", "", "", "", "", "", "", str(total_cantidad), "", "",
+                  _celda_totales(neto_usd, neto_crc, neto_usd < 0, neto_crc < 0),
+                  _celda_totales(neto_usd, neto_crc, neto_usd < 0, neto_crc < 0)])
+
+    anchos = [0.03, 0.07, 0.135, 0.07, 0.08, 0.145, 0.08, 0.06, 0.075, 0.075, 0.085, 0.085]
+    tabla = Table(datos, colWidths=[W * a for a in anchos], repeatRows=1)
+    fila_total = len(datos) - 1
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, -1), F_NORMAL),
+        ("FONTNAME", (0, 0), (-1, 0), F_NEGRITA),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+        ("GRID", (0, 0), (-1, -1), 0.4, BORDE),
+        ("ROWBACKGROUNDS", (0, 1), (-1, fila_total - 1), [colors.white, ZEBRA]),
+        ("ALIGN", (7, 1), (-1, -1), "RIGHT"),
+        ("ALIGN", (0, 1), (1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("BACKGROUND", (0, fila_total), (-1, fila_total), NAVY),
+        ("TEXTCOLOR", (0, fila_total), (-1, fila_total), colors.white),
+        ("FONTNAME", (0, fila_total), (-1, fila_total), F_NEGRITA),
+        ("SPAN", (0, fila_total), (6, fila_total)),
+        ("ALIGN", (0, fila_total), (0, fila_total), "LEFT"),
+        *estilos_filas,
+    ]))
+    elementos.append(tabla)
+
+    texto_pie = f"— {len(movimientos)} movimientos · Total {_fmt_moneda(neto_usd, 'USD', neto_usd < 0)}"
+    if neto_crc:
+        texto_pie += f" · {_fmt_moneda(neto_crc, 'CRC', neto_crc < 0)}"
+    texto_pie += " —"
+    elementos.append(Spacer(1, 3 * mm))
+    elementos.append(_p(texto_pie, 7.5, GRIS, italica=True, alin=1))
+
+    doc.build(elementos, canvasmaker=_CanvasNumerado)
+    buffer.seek(0)
+    respuesta = HttpResponse(buffer.read(), content_type="application/pdf")
+    respuesta["Content-Disposition"] = f'inline; filename="Movimientos_{desde}_{hasta}.pdf"'
     return respuesta

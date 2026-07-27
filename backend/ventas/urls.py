@@ -9,7 +9,7 @@ from .views import (
     observacion_dia,
     buscar_cedula,
 )
-from .reportes import pdf_resumen_dia, pdf_informe
+from .reportes import pdf_resumen_dia, pdf_informe, pdf_rango_movimientos
 from .informes import informe_resumen
 
 # El router arma solas todas las rutas del CRUD de cada recurso.
@@ -25,6 +25,7 @@ urlpatterns = [
     path("dias/<str:fecha>/", estado_dia),
     path("dias/<str:fecha>/observacion/", observacion_dia),
     path("reportes/dia/<str:fecha>/pdf/", pdf_resumen_dia),
+    path("reportes/rango/pdf/", pdf_rango_movimientos),
     # Informe administrativo (rango de fechas). Solo administradores.
     path("reportes/resumen/", informe_resumen),
     path("reportes/resumen/pdf/", pdf_informe),

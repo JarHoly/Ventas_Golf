@@ -278,12 +278,16 @@ export default function Informes() {
       {rangoValido && !cargando && datos && (
         <>
           {/* ===== Tarjetas de totales ===== */}
+          {/* No se convierte entre monedas: si hubo movimientos en colones
+              en el período, se agrega esa cifra aparte, sin mezclarla. */}
           <div className="inf-cards">
             <Tarjeta icono={faPlus} color={VERDE} etiqueta="VENTAS TOTALES" valor={`$${fmt(tot.ventas)}`}>
               <Delta actual={tot.ventas} anterior={ant.ventas} />
+              {tot.ventas_crc > 0 && <span className="inf-card-crc">+ ₡{fmt(tot.ventas_crc)}</span>}
             </Tarjeta>
             <Tarjeta icono={faMinus} color={ROJO} etiqueta="GASTOS TOTALES" valor={`$${fmt(tot.gastos)}`}>
               <Delta actual={tot.gastos} anterior={ant.gastos} invertir />
+              {tot.gastos_crc > 0 && <span className="inf-card-crc">+ ₡{fmt(tot.gastos_crc)}</span>}
             </Tarjeta>
             <Tarjeta
               icono={faDollarSign}
@@ -292,6 +296,9 @@ export default function Informes() {
               valor={`$${fmtSigno(tot.neto)}`}
             >
               <Delta actual={tot.neto} anterior={ant.neto} />
+              {tot.neto_crc !== 0 && (
+                <span className="inf-card-crc">+ ₡{fmtSigno(tot.neto_crc)}</span>
+              )}
             </Tarjeta>
             <Tarjeta icono={faHashtag} color={NAVY} etiqueta="MOVIMIENTOS" valor={tot.movimientos}>
               <Delta actual={tot.movimientos} anterior={ant.movimientos} neutro />
@@ -408,10 +415,17 @@ export default function Informes() {
                     <thead>
                       <tr>
                         <th>Método</th>
-                        <th>Movimientos</th>
-                        <th>Ventas</th>
-                        <th>Gastos</th>
-                        <th>Neto</th>
+                        <th>Cantidad</th>
+                        <th>Ventas ($)</th>
+                        <th>Gastos ($)</th>
+                        <th>Neto ($)</th>
+                        {datos.hay_crc && (
+                          <>
+                            <th>Ventas (₡)</th>
+                            <th>Gastos (₡)</th>
+                            <th>Neto (₡)</th>
+                          </>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -424,12 +438,21 @@ export default function Informes() {
                             />
                             {m.metodo}
                           </td>
-                          <td>{m.movimientos}</td>
+                          <td>{m.cantidad}</td>
                           <td>${fmt(m.ventas)}</td>
                           <td className={m.gastos > 0 ? "inf-rojo" : ""}>
                             ${m.gastos > 0 ? `(${fmt(m.gastos)})` : fmt(m.gastos)}
                           </td>
                           <td className={m.neto < 0 ? "inf-rojo" : ""}>${fmtSigno(m.neto)}</td>
+                          {datos.hay_crc && (
+                            <>
+                              <td>₡{fmt(m.ventas_crc)}</td>
+                              <td className={m.gastos_crc > 0 ? "inf-rojo" : ""}>
+                                ₡{m.gastos_crc > 0 ? `(${fmt(m.gastos_crc)})` : fmt(m.gastos_crc)}
+                              </td>
+                              <td className={m.neto_crc < 0 ? "inf-rojo" : ""}>₡{fmtSigno(m.neto_crc)}</td>
+                            </>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -479,32 +502,57 @@ export default function Informes() {
                     <thead>
                       <tr>
                         <th>Categoría</th>
-                        <th>Movimientos</th>
-                        <th>Ventas</th>
-                        <th>Gastos</th>
-                        <th>Neto</th>
+                        <th>Cantidad</th>
+                        <th>Ventas ($)</th>
+                        <th>Gastos ($)</th>
+                        <th>Neto ($)</th>
+                        {datos.hay_crc && (
+                          <>
+                            <th>Ventas (₡)</th>
+                            <th>Gastos (₡)</th>
+                            <th>Neto (₡)</th>
+                          </>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
                       {datos.por_categoria.map((c) => (
                         <tr key={c.categoria}>
                           <td>{c.categoria}</td>
-                          <td>{c.movimientos}</td>
+                          <td>{c.cantidad}</td>
                           <td>${fmt(c.ventas)}</td>
                           <td className={c.gastos > 0 ? "inf-rojo" : ""}>
                             ${c.gastos > 0 ? `(${fmt(c.gastos)})` : fmt(c.gastos)}
                           </td>
                           <td className={c.neto < 0 ? "inf-rojo" : ""}>${fmtSigno(c.neto)}</td>
+                          {datos.hay_crc && (
+                            <>
+                              <td>₡{fmt(c.ventas_crc)}</td>
+                              <td className={c.gastos_crc > 0 ? "inf-rojo" : ""}>
+                                ₡{c.gastos_crc > 0 ? `(${fmt(c.gastos_crc)})` : fmt(c.gastos_crc)}
+                              </td>
+                              <td className={c.neto_crc < 0 ? "inf-rojo" : ""}>₡{fmtSigno(c.neto_crc)}</td>
+                            </>
+                          )}
                         </tr>
                       ))}
                       <tr className="inf-fila-total">
                         <td>TOTALES</td>
-                        <td>{tot.movimientos}</td>
+                        <td>{tot.cantidad}</td>
                         <td>${fmt(tot.ventas)}</td>
                         <td className={tot.gastos > 0 ? "inf-rojo" : ""}>
                           ${tot.gastos > 0 ? `(${fmt(tot.gastos)})` : fmt(tot.gastos)}
                         </td>
                         <td className={tot.neto < 0 ? "inf-rojo" : ""}>${fmtSigno(tot.neto)}</td>
+                        {datos.hay_crc && (
+                          <>
+                            <td>₡{fmt(tot.ventas_crc)}</td>
+                            <td className={tot.gastos_crc > 0 ? "inf-rojo" : ""}>
+                              ₡{tot.gastos_crc > 0 ? `(${fmt(tot.gastos_crc)})` : fmt(tot.gastos_crc)}
+                            </td>
+                            <td className={tot.neto_crc < 0 ? "inf-rojo" : ""}>₡{fmtSigno(tot.neto_crc)}</td>
+                          </>
+                        )}
                       </tr>
                     </tbody>
                   </table>

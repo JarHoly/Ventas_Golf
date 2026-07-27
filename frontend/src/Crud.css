@@ -173,6 +173,22 @@
 .data-table tbody tr:hover {
   background: var(--neutral);
 }
+.th-ordenable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.th-ordenable:hover {
+  color: var(--primary);
+}
+.th-orden-icono {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--border);
+}
+.th-orden-icono.activo {
+  color: var(--primary);
+}
 .codigo-cell {
   font-weight: 700;
   color: var(--primary);

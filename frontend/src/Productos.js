@@ -13,6 +13,7 @@ import * as XLSX from "xlsx";
 import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 import { confirmarEliminar, mostrarError, avisoExito } from "./alertas";
 import Paginacion from "./Paginacion";
+import { useOrden, ThOrden } from "./Ordenamiento";
 import "./Crud.css";
 
 const POR_PAGINA = 10;
@@ -25,6 +26,7 @@ export default function Productos({ filtroInicial = "" }) {
   const [busqueda, setBusqueda] = useState(filtroInicial);
   const [pagina, setPagina] = useState(1);
   const [enEdicion, setEnEdicion] = useState(null);
+  const { orden, cambiarOrden, ordenar } = useOrden();
 
   async function cargar() {
     setCargando(true);
@@ -62,7 +64,10 @@ export default function Productos({ filtroInicial = "" }) {
           .some((campo) => campo.toLowerCase().includes(texto))
       )
     : items;
-  const visibles = filtrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
+  const ordenados = ordenar(filtrados, (p, campo) =>
+    campo === "precio_unitario" ? Number(p[campo]) : p[campo]
+  );
+  const visibles = ordenados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
 
   function exportarExcel() {
     const filas = items.map((p) => ({
@@ -131,11 +136,11 @@ export default function Productos({ filtroInicial = "" }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Tipo</th>
-                <th>Uso</th>
-                <th>Precio Unitario</th>
-                <th>Categoría</th>
+                <ThOrden campo="nombre" orden={orden} onClick={cambiarOrden}>Nombre</ThOrden>
+                <ThOrden campo="tipo" orden={orden} onClick={cambiarOrden}>Tipo</ThOrden>
+                <ThOrden campo="uso" orden={orden} onClick={cambiarOrden}>Uso</ThOrden>
+                <ThOrden campo="precio_unitario" orden={orden} onClick={cambiarOrden}>Precio Unitario</ThOrden>
+                <ThOrden campo="categoria_nombre" orden={orden} onClick={cambiarOrden}>Categoría</ThOrden>
                 <th>Acciones</th>
               </tr>
             </thead>

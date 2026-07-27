@@ -12,6 +12,7 @@ import * as XLSX from "xlsx";
 import { apiGet, apiPost, apiPut, apiDelete, buscarCedula } from "./api";
 import { confirmarEliminar, mostrarError, avisoExito } from "./alertas";
 import Paginacion from "./Paginacion";
+import { useOrden, ThOrden } from "./Ordenamiento";
 import "./Crud.css";
 
 const POR_PAGINA = 10;
@@ -31,6 +32,7 @@ export default function PersonasSeccion({ tipo, titulo, singular, icono, filtroI
   const [pagina, setPagina] = useState(1);
   // null = modal cerrado · {} = creando · {id,...} = editando ese registro
   const [enEdicion, setEnEdicion] = useState(null);
+  const { orden, cambiarOrden, ordenar } = useOrden();
 
   async function cargar() {
     setCargando(true);
@@ -71,8 +73,9 @@ export default function PersonasSeccion({ tipo, titulo, singular, icono, filtroI
       )
     : items;
 
-  // Paginación: recortamos solo las filas de la página actual.
-  const visibles = filtrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
+  // Paginación: recortamos solo las filas de la página actual (ya ordenadas).
+  const ordenados = ordenar(filtrados, (p, campo) => p[campo]);
+  const visibles = ordenados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
 
   function exportarExcel() {
     const filas = items.map((p) => ({
@@ -141,9 +144,9 @@ export default function PersonasSeccion({ tipo, titulo, singular, icono, filtroI
           <table className="data-table">
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Nombre</th>
-                <th>Cédula</th>
+                <ThOrden campo="codigo" orden={orden} onClick={cambiarOrden}>Código</ThOrden>
+                <ThOrden campo="nombre" orden={orden} onClick={cambiarOrden}>Nombre</ThOrden>
+                <ThOrden campo="cedula" orden={orden} onClick={cambiarOrden}>Cédula</ThOrden>
                 <th>Teléfono</th>
                 <th>Email</th>
                 <th>Acciones</th>

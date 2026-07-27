@@ -19,6 +19,25 @@
 .dia-input {
   width: auto;
 }
+.modo-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.modo-toggle button {
+  border: none;
+  background: var(--white);
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.modo-toggle button.activo {
+  background: var(--primary);
+  color: var(--white);
+  font-weight: 600;
+}
 .filtros-activos {
   border-color: var(--primary);
   color: var(--primary);
@@ -65,7 +84,16 @@
   white-space: nowrap;
 }
 .tabla-movs {
-  min-width: 900px; /* muchas columnas: en pantallas chicas se desliza */
+  min-width: 960px; /* muchas columnas: en pantallas chicas se desliza */
+}
+.badge-moneda {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--neutral);
+  color: var(--text-muted);
 }
 
 /* Badges de Venta / Gasto */

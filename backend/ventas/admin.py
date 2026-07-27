@@ -37,7 +37,10 @@ class ObservacionDiaAdmin(admin.ModelAdmin):
 
 @admin.register(Movimiento)
 class MovimientoAdmin(admin.ModelAdmin):
-    list_display = ["fecha", "numero", "tipo", "persona", "producto", "cantidad", "precio_unitario", "total"]
-    list_filter = ["tipo", "fecha", "metodo"]
+    list_display = [
+        "fecha", "numero", "tipo", "persona", "producto", "cantidad",
+        "precio_unitario", "moneda", "total",
+    ]
+    list_filter = ["tipo", "fecha", "metodo", "moneda"]
     search_fields = ["persona__nombre", "producto__nombre"]
     readonly_fields = ["numero", "creado_en"]

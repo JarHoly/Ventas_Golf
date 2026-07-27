@@ -13,6 +13,7 @@ import * as XLSX from "xlsx";
 import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 import { confirmarEliminar, mostrarError, avisoExito } from "./alertas";
 import Paginacion from "./Paginacion";
+import { useOrden, ThOrden } from "./Ordenamiento";
 import "./Crud.css";
 
 const POR_PAGINA = 10;
@@ -24,6 +25,7 @@ export default function Categorias({ filtroInicial = "" }) {
   const [busqueda, setBusqueda] = useState(filtroInicial);
   const [pagina, setPagina] = useState(1);
   const [enEdicion, setEnEdicion] = useState(null);
+  const { orden, cambiarOrden, ordenar } = useOrden();
 
   async function cargar() {
     setCargando(true);
@@ -56,7 +58,8 @@ export default function Categorias({ filtroInicial = "" }) {
   const filtrados = texto
     ? items.filter((c) => c.nombre.toLowerCase().includes(texto))
     : items;
-  const visibles = filtrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
+  const ordenados = ordenar(filtrados, (c, campo) => c[campo]);
+  const visibles = ordenados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
 
   function exportarExcel() {
     const filas = items.map((c) => ({ Nombre: c.nombre }));
@@ -119,7 +122,7 @@ export default function Categorias({ filtroInicial = "" }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Nombre</th>
+                <ThOrden campo="nombre" orden={orden} onClick={cambiarOrden}>Nombre</ThOrden>
                 <th>Acciones</th>
               </tr>
             </thead>

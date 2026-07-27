@@ -98,6 +98,10 @@ class Movimiento(models.Model):
         SINPE = "Sinpe", "Sinpe"
         TARJETA = "Tarjeta", "Tarjeta"
 
+    class Moneda(models.TextChoices):
+        USD = "USD", "USD"
+        CRC = "CRC", "CRC"
+
     # Consecutivo VISIBLE que reinicia cada día (1, 2, 3... y al otro día vuelve a 1).
     numero = models.PositiveIntegerField(editable=False)
     fecha = models.DateField()
@@ -110,6 +114,11 @@ class Movimiento(models.Model):
     metodo = models.CharField(max_length=15, choices=Metodo.choices, default=Metodo.EFECTIVO)
     descuento = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tipo = models.CharField(max_length=10, choices=Tipo.choices, default=Tipo.VENTA)
+    # Moneda en la que se registró el movimiento. precio_unitario/descuento/
+    # subtotal/total quedan expresados en ESA moneda (colones si es CRC).
+    # NO se lleva tipo de cambio ni conversión: los reportes muestran el
+    # total en dólares y el total en colones por separado, sin mezclarlos.
+    moneda = models.CharField(max_length=3, choices=Moneda.choices, default=Moneda.USD)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     # Quién lo registró (viene del login). Opcional, para auditoría.
