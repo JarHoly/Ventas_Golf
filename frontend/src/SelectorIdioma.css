@@ -1,5 +1,7 @@
 .selector-idioma {
   display: inline-flex;
+  align-items: stretch;
+  height: 38px;
   border-radius: 999px;
   overflow: hidden;
   /* Dentro de un flex container (el navbar), overflow:hidden hace que el
@@ -19,9 +21,11 @@
   letter-spacing: 0.03em;
 }
 
-/* Sobre el navbar blanco (Dashboard) */
+/* Sobre el navbar blanco (Dashboard): mismo borde que los demás botones
+   del navbar (campanita, salir), para que las 3 piezas se vean como un
+   mismo juego, no tres estilos distintos. */
 .selector-idioma-navbar {
-  border: 1px solid #d8e0ec;
+  border: 1px solid var(--border);
 }
 .selector-idioma-navbar button {
   background: #fff;

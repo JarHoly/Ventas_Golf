@@ -14,6 +14,7 @@ import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 import { confirmarEliminar, mostrarError, avisoExito } from "./alertas";
 import Paginacion from "./Paginacion";
 import { useOrden, ThOrden } from "./Ordenamiento";
+import ModalOverlay from "./ModalOverlay";
 import "./Crud.css";
 
 const POR_PAGINA = 10;
@@ -199,7 +200,7 @@ function CategoriaForm({ existente, onClose, onGuardado }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <ModalOverlay onClose={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal-title">
           {editando ? "Editar categoría" : "Nueva categoría"}
@@ -228,6 +229,6 @@ function CategoriaForm({ existente, onClose, onGuardado }) {
           </div>
         </form>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

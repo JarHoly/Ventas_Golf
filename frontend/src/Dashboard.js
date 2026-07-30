@@ -54,7 +54,7 @@ export default function Dashboard({ onLogout }) {
     { id: "instalar-app", label: t("pwa.menu"), icon: faMobileScreenButton },
   ];
   const MENU = esCliente() ? MENU_CLIENTE : MENU_PERSONAL;
-  const [seccion, setSeccion] = useState(esCliente() ? "inicio" : "clientes");
+  const [seccion, setSeccion] = useState(esCliente() ? "inicio" : "movimientos");
   // Filtro que la búsqueda global inyecta a la sección destino.
   const [filtroInicial, setFiltroInicial] = useState("");
 
@@ -221,7 +221,13 @@ export default function Dashboard({ onLogout }) {
           </div>
           )}
 
-          <SelectorIdioma variant="navbar" />
+          {/* El toggle ES/EN solo aplica al portal del cliente: el panel del
+              personal (Movimientos, Informes, etc.) es 100% español fijo y no
+              usa t(), así que mostrarlo ahí no cambiaba nada — y dejaba el
+              idioma del dispositivo en "en" sin que el staff lo notara, lo
+              cual sí afectaba después al portal del cliente en ese mismo
+              dispositivo. */}
+          {esCliente() && <SelectorIdioma variant="navbar" />}
 
           <Notificaciones />
 

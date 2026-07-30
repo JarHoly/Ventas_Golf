@@ -19,6 +19,7 @@ import * as XLSX from "xlsx";
 import { apiGet, apiPost, apiPut, apiDelete, apiGetBlob, esAdmin } from "./api";
 import { confirmarEliminar, mostrarError, avisoExito } from "./alertas";
 import SearchableSelect from "./SearchableSelect";
+import ModalOverlay from "./ModalOverlay";
 import "./Crud.css";
 import "./Movimientos.css";
 
@@ -663,7 +664,7 @@ function ObservacionForm({ fecha, textoInicial, onClose, onGuardado }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <ModalOverlay onClose={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal-title">
           Observaciones del día
@@ -699,7 +700,7 @@ function ObservacionForm({ fecha, textoInicial, onClose, onGuardado }) {
           </div>
         </form>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -810,7 +811,7 @@ function MovimientoForm({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <ModalOverlay onClose={onClose}>
       <div className="modal modal-movimiento" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal-title">
           {editando ? `Editar movimiento #${existente.numero}` : "Nuevo movimiento"}
@@ -904,6 +905,6 @@ function MovimientoForm({
           </div>
         </form>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

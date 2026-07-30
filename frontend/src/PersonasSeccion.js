@@ -13,6 +13,7 @@ import { apiGet, apiPost, apiPut, apiDelete, buscarCedula } from "./api";
 import { confirmarEliminar, mostrarError, avisoExito } from "./alertas";
 import Paginacion from "./Paginacion";
 import { useOrden, ThOrden } from "./Ordenamiento";
+import ModalOverlay from "./ModalOverlay";
 import "./Crud.css";
 
 const POR_PAGINA = 10;
@@ -260,7 +261,7 @@ function PersonaForm({ tipo, singular, existente, onClose, onGuardado }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <ModalOverlay onClose={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal-title">
           {editando ? `Editar ${singular}` : `Nuevo ${singular}`}
@@ -328,6 +329,6 @@ function PersonaForm({ tipo, singular, existente, onClose, onGuardado }) {
           </div>
         </form>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

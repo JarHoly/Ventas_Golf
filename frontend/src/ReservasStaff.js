@@ -18,6 +18,8 @@ import Swal from "sweetalert2";
 import { apiGet, apiPost, apiPut, apiDelete, apiGetBlob, esAdmin } from "./api";
 import { confirmarEliminar, mostrarError, avisoExito } from "./alertas";
 import SearchableSelect from "./SearchableSelect";
+import { EVENTO_NUEVAS } from "./Notificaciones";
+import ModalOverlay from "./ModalOverlay";
 import "./Crud.css";
 import "./Reservas.css";
 
@@ -93,6 +95,15 @@ function TabReservas() {
 
   useEffect(() => {
     cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado, fecha]);
+
+  useEffect(() => {
+    // Si llega una notificación nueva (ej. un cliente hizo/canceló una
+    // reserva) mientras el personal está viendo esta tabla, se refresca
+    // sola: no hay que salir y volver a entrar para ver el cambio.
+    window.addEventListener(EVENTO_NUEVAS, cargar);
+    return () => window.removeEventListener(EVENTO_NUEVAS, cargar);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estado, fecha]);
 
@@ -383,7 +394,7 @@ function AreaForm({ existente, onClose, onGuardado }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <ModalOverlay onClose={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal-title">{editando ? "Editar área" : "Nueva área"}</h2>
         {error && <div className="alert-error">{error}</div>}
@@ -429,7 +440,7 @@ function AreaForm({ existente, onClose, onGuardado }) {
           </div>
         </form>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -608,7 +619,7 @@ function CuentaForm({ personas, onClose, onGuardado }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <ModalOverlay onClose={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal-title">Nueva cuenta de cliente</h2>
         {error && <div className="alert-error">{error}</div>}
@@ -639,7 +650,7 @@ function CuentaForm({ personas, onClose, onGuardado }) {
           </div>
         </form>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

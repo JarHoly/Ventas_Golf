@@ -19,6 +19,7 @@ import {
   desactivarPush,
 } from "./push";
 import { IlustracionCompartir, IlustracionAgregar, IlustracionConfirmar } from "./InstalarAppIlustraciones";
+import ModalOverlay from "./ModalOverlay";
 import "./InstalarApp.css";
 
 // El navegador dispara este evento UNA vez por sesión, antes de que el
@@ -116,13 +117,25 @@ export function InstalarAppContenido() {
     return () => window.removeEventListener("beforeinstallprompt", onPrompt);
   }, []);
 
+  // "accepted" en userChoice solo significa que el usuario tocó "Instalar" en
+  // el diálogo del navegador — el navegador puede igual fallar al instalar
+  // después (pasó en producción: el diálogo decía "accepted" pero Chrome
+  // mostró "No fue posible instalar la aplicación web"). El único aviso
+  // confiable de que la instalación SÍ terminó es el evento "appinstalled".
+  useEffect(() => {
+    function onInstalled() {
+      setInstalada(true);
+    }
+    window.addEventListener("appinstalled", onInstalled);
+    return () => window.removeEventListener("appinstalled", onInstalled);
+  }, []);
+
   async function instalar() {
     if (!promptDiferido) return;
     setInstalando(true);
     promptDiferido.prompt();
-    const eleccion = await promptDiferido.userChoice;
+    await promptDiferido.userChoice;
     setInstalando(false);
-    if (eleccion.outcome === "accepted") setInstalada(true);
     promptDiferido = null;
     setHayPrompt(false);
   }
@@ -242,7 +255,7 @@ export function NotificacionesPush() {
 export function InstalarAppModal({ onClose }) {
   const { t } = useIdioma();
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <ModalOverlay onClose={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal-title">
           <FontAwesomeIcon icon={faMobileScreenButton} /> {t("pwa.titulo")}
@@ -256,7 +269,7 @@ export function InstalarAppModal({ onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
