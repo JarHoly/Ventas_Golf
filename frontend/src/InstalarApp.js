@@ -84,7 +84,10 @@ export function InstalarAppContenido() {
   if (instalada) {
     return (
       <div className="pwa-ok">
-        <FontAwesomeIcon icon={faCircleCheck} /> {t("pwa.ya_instalada")}
+        <span className="pwa-ok-icono">
+          <FontAwesomeIcon icon={faCircleCheck} />
+        </span>
+        {t("pwa.ya_instalada")}
       </div>
     );
   }
@@ -93,14 +96,20 @@ export function InstalarAppContenido() {
     return (
       <ol className="pwa-pasos">
         <li>
+          <span className="pwa-paso-numero">1</span>
           <FontAwesomeIcon icon={faShareFromSquare} className="pwa-paso-icono" />
-          {t("pwa.paso_ios_1")}
+          <span>{t("pwa.paso_ios_1")}</span>
         </li>
         <li>
+          <span className="pwa-paso-numero">2</span>
           <FontAwesomeIcon icon={faSquarePlus} className="pwa-paso-icono" />
-          {t("pwa.paso_ios_2")}
+          <span>{t("pwa.paso_ios_2")}</span>
         </li>
-        <li>{t("pwa.paso_ios_3")}</li>
+        <li>
+          <span className="pwa-paso-numero">3</span>
+          <FontAwesomeIcon icon={faCircleCheck} className="pwa-paso-icono" />
+          <span>{t("pwa.paso_ios_3")}</span>
+        </li>
       </ol>
     );
   }
@@ -158,6 +167,10 @@ export function NotificacionesPush() {
   if (!pushDisponible()) {
     return (
       <div className="pwa-push">
+        <h3 className="pwa-push-titulo">
+          <span className="pwa-push-icono"><FontAwesomeIcon icon={faBell} /></span>
+          {t("pwa.push_titulo")}
+        </h3>
         <p className="pwa-generico">{t("pwa.push_no_soportado")}</p>
       </div>
     );
@@ -166,7 +179,10 @@ export function NotificacionesPush() {
   return (
     <div className="pwa-push">
       <h3 className="pwa-push-titulo">
-        <FontAwesomeIcon icon={faBell} /> {t("pwa.push_titulo")}
+        <span className={"pwa-push-icono" + (suscrito ? " activo" : "")}>
+          <FontAwesomeIcon icon={faBell} />
+        </span>
+        {t("pwa.push_titulo")}
       </h3>
       <p className="form-hint" style={{ marginTop: 0 }}>{t("pwa.push_intro")}</p>
       {permisoDenegado() ? (
@@ -213,15 +229,19 @@ export function InstalarAppSeccion() {
   const { t } = useIdioma();
   return (
     <div>
-      <div className="page-top">
-        <div className="page-header">
+      <div className="pwa-hero">
+        <span className="pwa-hero-icono">
           <FontAwesomeIcon icon={faMobileScreenButton} />
-          <h1>{t("pwa.titulo")}</h1>
+        </span>
+        <div>
+          <h1 className="pwa-hero-titulo">{t("pwa.titulo")}</h1>
+          <p className="pwa-hero-sub">{t("pwa.intro")}</p>
         </div>
       </div>
-      <div className="table-card" style={{ padding: 20 }}>
-        <p className="form-hint" style={{ marginTop: 0 }}>{t("pwa.intro")}</p>
+      <div className="table-card pwa-card">
         <InstalarAppContenido />
+      </div>
+      <div className="table-card pwa-card">
         <NotificacionesPush />
       </div>
     </div>
