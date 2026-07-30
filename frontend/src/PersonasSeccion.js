@@ -158,8 +158,8 @@ export default function PersonasSeccion({ tipo, titulo, singular, icono, filtroI
                   <td className="codigo-cell">{p.codigo}</td>
                   <td>{p.nombre}</td>
                   <td>{p.cedula}</td>
-                  <td>{p.telefono || "—"}</td>
-                  <td>{p.email || "—"}</td>
+                  <td>{p.telefono || "-"}</td>
+                  <td>{p.email || "-"}</td>
                   <td>
                     <button
                       className="btn-icon-edit"

@@ -505,7 +505,7 @@ def pdf_resumen_dia(request, fecha):
         # Con texto: se imprime (escapado, con saltos de línea) + quién y cuándo.
         parrafo = _p(escape(texto_obs).replace("\n", "<br/>"), 8, leading=11.5)
         quien = obs.actualizado_por
-        nombre = (quien.get_full_name() or quien.username) if quien else "—"
+        nombre = (quien.get_full_name() or quien.username) if quien else "Sin registrar"
         cuando = timezone.localtime(obs.actualizado_en).strftime("%d/%m/%Y %H:%M")
         sello = _p(f"Última edición: {nombre} · {cuando}", 6.5, GRIS, italica=True)
         # La caja debe medir LO MISMO que la de distribución (138pt) aunque la
@@ -557,10 +557,9 @@ def pdf_resumen_dia(request, fecha):
     elementos.append(tabla)
 
     # Marcador de integridad: si falta la última hoja, se nota de inmediato.
-    texto_pie = f"— Fin del detalle · {len(movimientos)} movimientos · Total {_fmt_moneda(neto_total, 'USD', neto_total < 0)}"
+    texto_pie = f"Fin del detalle · {len(movimientos)} movimientos · Total {_fmt_moneda(neto_total, 'USD', neto_total < 0)}"
     if neto_total_crc:
         texto_pie += f" · {_fmt_moneda(neto_total_crc, 'CRC', neto_total_crc < 0)}"
-    texto_pie += " —"
     elementos.append(Spacer(1, 3 * mm))
     elementos.append(_p(texto_pie, 7.5, GRIS, italica=True, alin=1))
 
@@ -867,12 +866,11 @@ def pdf_informe(request):
     elementos.append(tabla)
 
     texto_pie_informe = (
-        f"— Informe del {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')} · "
+        f"Informe del {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')} · "
         f"{tot['movimientos']} movimientos · Neto {_fmt_moneda(tot['neto'], 'USD', tot['neto'] < 0)}"
     )
     if hay_crc:
         texto_pie_informe += f" · {_fmt_moneda(tot['neto_crc'], 'CRC', tot['neto_crc'] < 0)}"
-    texto_pie_informe += " —"
     elementos.append(Spacer(1, 3 * mm))
     elementos.append(_p(texto_pie_informe, 7.5, GRIS, italica=True, alin=1))
 
@@ -1170,7 +1168,7 @@ def pdf_rango_movimientos(request):
         while len(filas_filtros) < 6:
             filas_filtros.append([""])
     else:
-        filas_filtros.append([_p("Ninguno — se incluyen todos los movimientos del período.", 8, GRIS, italica=True)])
+        filas_filtros.append([_p("Ninguno: se incluyen todos los movimientos del período.", 8, GRIS, italica=True)])
         filas_filtros += [[""] for _ in range(4)]
     caja_filtros = Table(filas_filtros, colWidths=[ancho_filtros], rowHeights=[18] + [24] * 5)
     caja_filtros.setStyle(TableStyle([
@@ -1257,10 +1255,9 @@ def pdf_rango_movimientos(request):
     ]))
     elementos.append(tabla)
 
-    texto_pie = f"— {len(movimientos)} movimientos · Total {_fmt_moneda(neto_usd, 'USD', neto_usd < 0)}"
+    texto_pie = f"{len(movimientos)} movimientos · Total {_fmt_moneda(neto_usd, 'USD', neto_usd < 0)}"
     if neto_crc:
         texto_pie += f" · {_fmt_moneda(neto_crc, 'CRC', neto_crc < 0)}"
-    texto_pie += " —"
     elementos.append(Spacer(1, 3 * mm))
     elementos.append(_p(texto_pie, 7.5, GRIS, italica=True, alin=1))
 

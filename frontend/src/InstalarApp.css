@@ -57,45 +57,80 @@
   font-size: 1.2rem;
 }
 
-.pwa-pasos {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* ---- Carrusel interactivo del tutorial de iOS ---- */
+.pwa-carrusel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.pwa-pasos li {
-  display: flex;
   align-items: center;
   gap: 12px;
-  background: #f5f8fc;
-  border: 1px solid #d8e0ec;
-  border-radius: 10px;
-  padding: 12px 14px;
-  font-size: 0.88rem;
-  color: #22304a;
+  padding: 6px 0 2px;
 }
 
-.pwa-paso-numero {
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+.pwa-carrusel-ilustracion {
+  background: #f5f8fc;
+  border: 1px solid #d8e0ec;
+  border-radius: 14px;
+  padding: 14px 20px;
+  display: flex;
+}
+
+.pwa-carrusel-texto {
+  text-align: center;
+  font-size: 0.92rem;
+  color: #22304a;
+  max-width: 320px;
+  margin: 0;
+  min-height: 44px;
+}
+
+.pwa-carrusel-nav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pwa-carrusel-flecha {
+  border: 1px solid #d8e0ec;
+  background: #fff;
+  color: #132f63;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #132f63;
-  color: #fff;
-  font-size: 0.78rem;
-  font-weight: 700;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.pwa-paso-icono {
-  color: #132f63;
-  font-size: 1.15rem;
-  flex: 0 0 auto;
+.pwa-carrusel-flecha:hover:not(:disabled) {
+  background: #f5f8fc;
+  border-color: #132f63;
+}
+
+.pwa-carrusel-flecha:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pwa-carrusel-puntos {
+  display: flex;
+  gap: 7px;
+}
+
+.pwa-carrusel-punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: #d8e0ec;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pwa-carrusel-punto.activo {
+  background: #132f63;
+  width: 20px;
+  border-radius: 4px;
 }
 
 .pwa-instalar-android {

@@ -202,36 +202,79 @@
   width: auto;
 }
 
+/* Grupos Mañana/Tarde: partir la grilla larga en bloques más fáciles de escanear. */
+.res-franjas-grupo {
+  margin-bottom: 14px;
+}
+
+.res-franjas-grupo-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 8px;
+}
+
 .res-franjas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   gap: 8px;
 }
 
 .res-franja {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   align-items: center;
-  padding: 10px 6px;
+  padding: 9px 6px;
   border: 1.5px solid #cfe0d8;
   background: #f2faf5;
   color: #14713f;
   border-radius: 10px;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: transform 0.1s, border-color 0.15s;
 }
 
+.res-franja-hora {
+  font-size: 0.8rem;
+}
+
 .res-franja span {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 500;
 }
 
 .res-franja:hover:not(:disabled) {
   border-color: #14713f;
   transform: translateY(-1px);
+}
+
+/* La franja libre más próxima: se destaca para no tener que comparar todas. */
+.res-franja.proxima {
+  border-width: 2px;
+  border-color: #14713f;
+  box-shadow: 0 0 0 3px rgba(20, 113, 63, 0.12);
+}
+
+.res-franja-badge {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #14713f;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 .res-franja-cupos {

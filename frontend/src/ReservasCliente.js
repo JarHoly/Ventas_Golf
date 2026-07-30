@@ -11,6 +11,8 @@ import {
   faCircleInfo,
   faUserGroup,
   faClockRotateLeft,
+  faSun,
+  faMoon,
 } from "@fortawesome/free-solid-svg-icons";
 import Swal from "sweetalert2";
 import { apiGet, apiPost, apiPut, apiDelete, apiPostForm, apiGetBlob } from "./api";
@@ -444,30 +446,53 @@ function SelectorFranja({ area, reservaACambiar, onListo, onCancelar }) {
       ) : franjas.length === 0 ? (
         <div className="table-empty">{t("res.sin_franjas")}</div>
       ) : (
-        <div className="res-franjas">
-          {franjas.map((f) => {
-            const libre = f.cupo_disponible > 0;
-            const parcial = libre && f.cupo_disponible < CUPO_MAX;
-            return (
-              <button
-                key={f.hora_inicio}
-                className={"res-franja" + (libre ? (parcial ? " parcial" : "") : " ocupada")}
-                disabled={!libre}
-                onClick={() => elegir(f)}
-              >
-                {f.hora_inicio}–{f.hora_fin}
-                <span className="res-franja-cupos">
-                  {Array.from({ length: CUPO_MAX }, (_, i) => (
-                    <i key={i} className={i < CUPO_MAX - f.cupo_disponible ? "ocupado" : ""} />
-                  ))}
+        (() => {
+          // Agrupadas en Mañana/Tarde: una sola lista larga de franjas de
+          // 15 min se hace ilegible: partirla ayuda a ubicarse de un vistazo.
+          const primeraLibre = franjas.find((f) => f.cupo_disponible > 0)?.hora_inicio;
+          const manana = franjas.filter((f) => f.hora_inicio < "12:00");
+          const tarde = franjas.filter((f) => f.hora_inicio >= "12:00");
+          const grupo = (etiqueta, icono, lista) =>
+            lista.length > 0 && (
+              <div className="res-franjas-grupo" key={etiqueta}>
+                <span className="res-franjas-grupo-titulo">
+                  <FontAwesomeIcon icon={icono} /> {etiqueta}
                 </span>
-                <span>
-                  {libre ? t("res.cupos_disponibles", { n: f.cupo_disponible, total: CUPO_MAX }) : t("res.completo")}
-                </span>
-              </button>
+                <div className="res-franjas">
+                  {lista.map((f) => {
+                    const libre = f.cupo_disponible > 0;
+                    const parcial = libre && f.cupo_disponible < CUPO_MAX;
+                    const esProxima = f.hora_inicio === primeraLibre;
+                    return (
+                      <button
+                        key={f.hora_inicio}
+                        className={"res-franja" + (libre ? (parcial ? " parcial" : "") : " ocupada") + (esProxima ? " proxima" : "")}
+                        disabled={!libre}
+                        onClick={() => elegir(f)}
+                      >
+                        {esProxima && <span className="res-franja-badge">{t("res.proxima_libre")}</span>}
+                        <span className="res-franja-hora">{f.hora_inicio}–{f.hora_fin}</span>
+                        <span className="res-franja-cupos">
+                          {Array.from({ length: CUPO_MAX }, (_, i) => (
+                            <i key={i} className={i < CUPO_MAX - f.cupo_disponible ? "ocupado" : ""} />
+                          ))}
+                        </span>
+                        <span>
+                          {libre ? t("res.cupos_disponibles", { n: f.cupo_disponible, total: CUPO_MAX }) : t("res.completo")}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             );
-          })}
-        </div>
+          return (
+            <>
+              {grupo(t("res.manana"), faSun, manana)}
+              {grupo(t("res.tarde"), faMoon, tarde)}
+            </>
+          );
+        })()
       )}
     </div>
   );

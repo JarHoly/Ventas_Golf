@@ -281,7 +281,7 @@ export default function Movimientos() {
 
   // Etiquetas para los selects con búsqueda.
   const opcionesPersona = personas.map((p) => ({ id: p.id, label: `${p.codigo} · ${p.nombre} (${p.tipo})` }));
-  const opcionesProducto = productos.map((p) => ({ id: p.id, label: `${p.nombre} — $${fmt(p.precio_unitario)}` }));
+  const opcionesProducto = productos.map((p) => ({ id: p.id, label: `${p.nombre} · $${fmt(p.precio_unitario)}` }));
 
   return (
     <div>
@@ -587,7 +587,7 @@ export default function Movimientos() {
             <>
               <p className="obs-texto">{obs.texto}</p>
               <span className="obs-meta">
-                Última edición: {obs.actualizado_por || "—"} ·{" "}
+                Última edición: {obs.actualizado_por || "Sin registrar"} ·{" "}
                 {obs.actualizado_en
                   ? new Date(obs.actualizado_en).toLocaleString("es-CR", {
                       dateStyle: "short",

@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faMobileScreenButton,
-  faShareFromSquare,
-  faSquarePlus,
   faDownload,
   faCircleCheck,
   faBell,
   faBellSlash,
+  faChevronLeft,
+  faChevronRight,
 } from "@fortawesome/free-solid-svg-icons";
 import { useIdioma } from "./i18n";
 import { mostrarError, avisoExito } from "./alertas";
@@ -18,6 +18,7 @@ import {
   activarPush,
   desactivarPush,
 } from "./push";
+import { IlustracionCompartir, IlustracionAgregar, IlustracionConfirmar } from "./InstalarAppIlustraciones";
 import "./InstalarApp.css";
 
 // El navegador dispara este evento UNA vez por sesión, antes de que el
@@ -52,6 +53,51 @@ export function tutorialYaVisto(usuario) {
 
 export function marcarTutorialVisto(usuario) {
   if (usuario) localStorage.setItem(clave(usuario), "1");
+}
+
+// Carrusel de pasos con ilustración: más interactivo que una lista estática.
+function TutorialCarrusel({ pasos }) {
+  const { t } = useIdioma();
+  const [paso, setPaso] = useState(0);
+  const actual = pasos[paso];
+
+  return (
+    <div className="pwa-carrusel">
+      <div className="pwa-carrusel-ilustracion">{actual.ilustracion}</div>
+      <p className="pwa-carrusel-texto">{actual.texto}</p>
+      <div className="pwa-carrusel-nav">
+        <button
+          type="button"
+          className="pwa-carrusel-flecha"
+          onClick={() => setPaso((p) => Math.max(0, p - 1))}
+          disabled={paso === 0}
+          aria-label={t("res.volver")}
+        >
+          <FontAwesomeIcon icon={faChevronLeft} />
+        </button>
+        <div className="pwa-carrusel-puntos">
+          {pasos.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              className={"pwa-carrusel-punto" + (i === paso ? " activo" : "")}
+              onClick={() => setPaso(i)}
+              aria-label={`${i + 1}`}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          className="pwa-carrusel-flecha"
+          onClick={() => setPaso((p) => Math.min(pasos.length - 1, p + 1))}
+          disabled={paso === pasos.length - 1}
+          aria-label={t("res.continuar")}
+        >
+          <FontAwesomeIcon icon={faChevronRight} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ===== Contenido del tutorial (se usa igual en el modal y en la sección fija) =====
@@ -94,23 +140,13 @@ export function InstalarAppContenido() {
 
   if (esIOS()) {
     return (
-      <ol className="pwa-pasos">
-        <li>
-          <span className="pwa-paso-numero">1</span>
-          <FontAwesomeIcon icon={faShareFromSquare} className="pwa-paso-icono" />
-          <span>{t("pwa.paso_ios_1")}</span>
-        </li>
-        <li>
-          <span className="pwa-paso-numero">2</span>
-          <FontAwesomeIcon icon={faSquarePlus} className="pwa-paso-icono" />
-          <span>{t("pwa.paso_ios_2")}</span>
-        </li>
-        <li>
-          <span className="pwa-paso-numero">3</span>
-          <FontAwesomeIcon icon={faCircleCheck} className="pwa-paso-icono" />
-          <span>{t("pwa.paso_ios_3")}</span>
-        </li>
-      </ol>
+      <TutorialCarrusel
+        pasos={[
+          { ilustracion: <IlustracionCompartir />, texto: t("pwa.paso_ios_1") },
+          { ilustracion: <IlustracionAgregar />, texto: t("pwa.paso_ios_2") },
+          { ilustracion: <IlustracionConfirmar />, texto: t("pwa.paso_ios_3") },
+        ]}
+      />
     );
   }
 
