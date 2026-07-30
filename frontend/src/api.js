@@ -35,6 +35,11 @@ export function rolUsuario() {
 export const esAdmin = () => rolUsuario() === "Admin";
 export const esCliente = () => rolUsuario() === "Cliente";
 
+// ===== Usuario actual (lo guardó el login) =====
+export function usuarioActual() {
+  return localStorage.getItem("username") || sessionStorage.getItem("username") || "";
+}
+
 // ===== Helpers para llamadas que necesitan estar logueado =====
 
 // Recupera el token guardado (venga de "recuérdame" o de la sesión actual).
@@ -94,11 +99,12 @@ export async function apiPut(path, body) {
   );
 }
 
-export async function apiDelete(path) {
+export async function apiDelete(path, body) {
   return procesar(
     await fetch(`${API_URL}${path}`, {
       method: "DELETE",
       headers: authHeaders(),
+      ...(body ? { body: JSON.stringify(body) } : {}),
     }),
   );
 }

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AreaReserva, Reserva, Notificacion
+from .models import AreaReserva, Reserva, Notificacion, PushSubscription
 
 
 @admin.register(AreaReserva)
@@ -19,3 +19,9 @@ class ReservaAdmin(admin.ModelAdmin):
 class NotificacionAdmin(admin.ModelAdmin):
     list_display = ["user", "mensaje", "leida", "creada_en"]
     list_filter = ["leida"]
+
+
+@admin.register(PushSubscription)
+class PushSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ["user", "endpoint", "creada_en"]
+    search_fields = ["user__username"]

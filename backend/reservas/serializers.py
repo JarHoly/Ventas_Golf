@@ -24,8 +24,9 @@ class ReservaSerializer(serializers.ModelSerializer):
         model = Reserva
         fields = [
             "id", "area", "area_nombre", "fecha", "hora_inicio", "hora_fin",
-            "precio", "estado", "motivo_rechazo", "tiene_comprobante",
-            "comprobante_vencido", "cliente", "cliente_nombre", "creada_en",
+            "cantidad_personas", "precio", "estado", "motivo_rechazo",
+            "tiene_comprobante", "comprobante_vencido", "cliente", "cliente_nombre",
+            "creada_en",
         ]
         read_only_fields = [
             "hora_fin", "precio", "estado", "motivo_rechazo", "cliente", "creada_en",

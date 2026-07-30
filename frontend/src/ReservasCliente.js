@@ -9,13 +9,21 @@ import {
   faFileArrowDown,
   faTriangleExclamation,
   faCircleInfo,
+  faUserGroup,
+  faClockRotateLeft,
 } from "@fortawesome/free-solid-svg-icons";
 import Swal from "sweetalert2";
 import { apiGet, apiPost, apiPut, apiDelete, apiPostForm, apiGetBlob } from "./api";
 import { mostrarError, avisoExito } from "./alertas";
 import { useIdioma } from "./i18n";
+import { EVENTO_NUEVAS } from "./Notificaciones";
 import "./Crud.css";
 import "./Reservas.css";
+
+// Debe coincidir con CAPACIDAD_MAX_FRANJA en backend/reservas/models.py.
+// Solo se usa acá para el texto informativo ANTES de elegir fecha/franja
+// (una vez elegida, el cupo real por franja viene del backend).
+const CUPO_MAX = 4;
 
 const fmt = (n) =>
   Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -58,6 +66,12 @@ export default function ReservasCliente() {
 
   useEffect(() => {
     cargar();
+    // Si llega una notificación nueva (ej. el personal aceptó/rechazó una
+    // reserva) mientras estás en esta pantalla, se refresca sola: no hay
+    // que salir y volver a entrar para ver el cambio.
+    window.addEventListener(EVENTO_NUEVAS, cargar);
+    return () => window.removeEventListener(EVENTO_NUEVAS, cargar);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Confirmación de borrado TRADUCIDA (alertas.js queda fija en español —
@@ -102,6 +116,12 @@ export default function ReservasCliente() {
     );
   }
 
+  // Próximas: lo que todavía está por jugarse (y no fue rechazado).
+  // Historial: lo que ya pasó o quedó rechazado — registro de solo lectura.
+  const hoy = hoyISO();
+  const proximas = mias.filter((r) => r.fecha >= hoy && r.estado !== "Rechazada");
+  const historial = mias.filter((r) => r.fecha < hoy || r.estado === "Rechazada");
+
   return (
     <div>
       <div className="page-top">
@@ -133,6 +153,9 @@ export default function ReservasCliente() {
               <span className="res-area-datos">
                 ${fmt(a.precio)} · {a.duracion_minutos} {t("res.min")} · {horaCorta(a.hora_apertura)}–{horaCorta(a.hora_cierre)}
               </span>
+              <span className="res-area-cupo">
+                <FontAwesomeIcon icon={faUserGroup} /> {t("res.max_por_franja", { n: CUPO_MAX })}
+              </span>
             </button>
           ))}
         </div>
@@ -154,68 +177,115 @@ export default function ReservasCliente() {
         />
       )}
 
-      {/* ===== Mis reservas ===== */}
+      {/* ===== Mis reservas: próximas + historial ===== */}
       <h2 className="res-subtitulo">{t("res.mis_reservas")}</h2>
       {mias.length === 0 ? (
         <div className="table-card">
           <div className="table-empty">{t("res.sin_reservas")}</div>
         </div>
       ) : (
-        <div className="res-lista">
-          {mias.map((r) => (
-            <div key={r.id} className="res-item">
-              <div className="res-item-info">
-                <span className="res-item-titulo">
-                  {r.area_nombre} · {fechaCorta(r.fecha)} · {horaCorta(r.hora_inicio)}–{horaCorta(r.hora_fin)}
-                </span>
-                <span className="res-item-sub">
-                  ${fmt(r.precio)} ·{" "}
-                  <span className={`res-chip res-${r.estado.toLowerCase()}`}>
-                    {t(`estado.${r.estado}`)}
-                  </span>
-                </span>
-                {r.estado === "Rechazada" && r.motivo_rechazo && (
-                  <span className="res-item-motivo">
-                    <FontAwesomeIcon icon={faCircleInfo} /> {r.motivo_rechazo}
-                  </span>
-                )}
-                {r.estado === "Pendiente" && !r.tiene_comprobante && (
-                  <span className={"res-item-aviso" + (r.comprobante_vencido ? " vencido" : "")}>
-                    <FontAwesomeIcon icon={faTriangleExclamation} />{" "}
-                    {r.comprobante_vencido
-                      ? t("res.aviso_vencido")
-                      : t("res.aviso_adjuntar", { h: horasRestantes(r.creada_en) })}
-                  </span>
-                )}
-              </div>
-              <div className="res-item-acciones">
-                {r.tiene_comprobante ? (
-                  <button className="btn-ghost" onClick={() => verComprobante(r)}>
-                    <FontAwesomeIcon icon={faFileArrowDown} /> {t("res.comprobante")}
-                  </button>
-                ) : (
-                  <SubirComprobante reserva={r} onSubido={cargar} />
-                )}
-                <button
-                  className="btn-ghost"
-                  onClick={() => {
+        <>
+          {proximas.length === 0 ? (
+            <div className="table-card">
+              <div className="table-empty">{t("res.sin_proximas")}</div>
+            </div>
+          ) : (
+            <div className="res-tickets">
+              {proximas.map((r) => (
+                <TarjetaReserva
+                  key={r.id}
+                  r={r}
+                  onVerComprobante={verComprobante}
+                  onSubido={cargar}
+                  onCambiar={() => {
                     const area = areas.find((a) => a.id === r.area);
                     if (!area) return mostrarError(t("res.area_no_disponible"));
                     setCambiando(r);
                     setAreaElegida(area);
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
-                >
-                  <FontAwesomeIcon icon={faPen} /> {t("res.cambiar")}
-                </button>
-                <button className="btn-icon-danger" title={t("res.eliminar_confirmar")} onClick={() => eliminar(r)}>
-                  <FontAwesomeIcon icon={faTrash} />
-                </button>
-              </div>
+                  onEliminar={() => eliminar(r)}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+
+          {historial.length > 0 && (
+            <>
+              <h2 className="res-subtitulo res-subtitulo-historial">
+                <FontAwesomeIcon icon={faClockRotateLeft} /> {t("res.historial")}
+              </h2>
+              <div className="res-tickets historial">
+                {historial.map((r) => (
+                  <TarjetaReserva key={r.id} r={r} onVerComprobante={verComprobante} historial />
+                ))}
+              </div>
+            </>
+          )}
+        </>
       )}
+    </div>
+  );
+}
+
+// Una reserva como "boleto": bloque de fecha a la izquierda + franja de color
+// según el estado. En "historial" es de solo lectura (sin adjuntar/cambiar/
+// eliminar): es un registro de lo que ya pasó.
+function TarjetaReserva({ r, onVerComprobante, onSubido, onCambiar, onEliminar, historial = false }) {
+  const { t, idioma } = useIdioma();
+  const fecha = new Date(`${r.fecha}T00:00:00`);
+  const dia = fecha.getDate();
+  const mes = fecha.toLocaleDateString(idioma === "en" ? "en-US" : "es-CR", { month: "short" }).replace(".", "");
+
+  return (
+    <div className={`res-ticket res-ticket-${r.estado.toLowerCase()}` + (historial ? " historial" : "")}>
+      <div className="res-ticket-fecha">
+        <span className="res-ticket-dia">{dia}</span>
+        <span className="res-ticket-mes">{mes}</span>
+      </div>
+      <div className="res-ticket-cuerpo">
+        <div className="res-ticket-info">
+          <span className="res-item-titulo">
+            {r.area_nombre} · {horaCorta(r.hora_inicio)}–{horaCorta(r.hora_fin)}
+          </span>
+          <span className="res-item-sub">
+            ${fmt(r.precio)} · {t("res.para_n_personas", { n: r.cantidad_personas })} ·{" "}
+            <span className={`res-chip res-${r.estado.toLowerCase()}`}>{t(`estado.${r.estado}`)}</span>
+          </span>
+          {r.estado === "Rechazada" && r.motivo_rechazo && (
+            <span className="res-item-motivo">
+              <FontAwesomeIcon icon={faCircleInfo} /> {r.motivo_rechazo}
+            </span>
+          )}
+          {!historial && r.estado === "Pendiente" && !r.tiene_comprobante && (
+            <span className={"res-item-aviso" + (r.comprobante_vencido ? " vencido" : "")}>
+              <FontAwesomeIcon icon={faTriangleExclamation} />{" "}
+              {r.comprobante_vencido
+                ? t("res.aviso_vencido")
+                : t("res.aviso_adjuntar", { h: horasRestantes(r.creada_en) })}
+            </span>
+          )}
+        </div>
+        <div className="res-item-acciones">
+          {r.tiene_comprobante ? (
+            <button className="btn-ghost" onClick={() => onVerComprobante(r)}>
+              <FontAwesomeIcon icon={faFileArrowDown} /> {t("res.comprobante")}
+            </button>
+          ) : (
+            !historial && <SubirComprobante reserva={r} onSubido={onSubido} />
+          )}
+          {!historial && (
+            <>
+              <button className="btn-ghost" onClick={onCambiar}>
+                <FontAwesomeIcon icon={faPen} /> {t("res.cambiar")}
+              </button>
+              <button className="btn-icon-danger" title={t("res.eliminar_confirmar")} onClick={onEliminar}>
+                <FontAwesomeIcon icon={faTrash} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -291,9 +361,33 @@ function SelectorFranja({ area, reservaACambiar, onListo, onCancelar }) {
   }, [area.id, fecha]);
 
   async function elegir(franja) {
+    const cupo = franja.cupo_disponible;
+    // Paso 1: cuántas personas (acotado al cupo real que queda en la franja).
+    const valorInicial = Math.min(reservaACambiar?.cantidad_personas || 1, cupo);
+    const { value: cantidad } = await Swal.fire({
+      title: t("res.cuantas_personas"),
+      html: `<b>${area.nombre}</b><br/>${fechaCorta(fecha)} · ${franja.hora_inicio}–${franja.hora_fin}<br/><span style="color:#64748b">${t("res.cuantas_personas_sub", { n: cupo })}</span>`,
+      input: "number",
+      inputValue: valorInicial,
+      inputAttributes: { min: 1, max: cupo, step: 1 },
+      showCancelButton: true,
+      confirmButtonText: t("res.continuar"),
+      cancelButtonText: t("res.volver"),
+      confirmButtonColor: "#0056b3",
+      reverseButtons: true,
+      inputValidator: (v) => {
+        const n = Number(v);
+        if (!v || !Number.isInteger(n) || n < 1) return t("res.cuantas_personas");
+        if (n > cupo) return t("res.cuantas_personas_sub", { n: cupo });
+        return undefined;
+      },
+    });
+    if (!cantidad) return;
+
+    // Paso 2: confirmación final con todos los datos.
     const res = await Swal.fire({
       title: reservaACambiar ? t("res.confirmar_cambio") : t("res.confirmar_reserva"),
-      html: `<b>${area.nombre}</b><br/>${fechaCorta(fecha)} · ${franja.hora_inicio}–${franja.hora_fin}<br/>${t("res.precio")} <b>$${fmt(area.precio)}</b>`,
+      html: `<b>${area.nombre}</b><br/>${fechaCorta(fecha)} · ${franja.hora_inicio}–${franja.hora_fin}<br/>${t("res.para_n_personas", { n: cantidad })}<br/>${t("res.precio")} <b>$${fmt(area.precio)}</b>`,
       icon: "question",
       showCancelButton: true,
       confirmButtonText: reservaACambiar ? t("res.si_cambiar") : t("res.si_reservar"),
@@ -303,7 +397,10 @@ function SelectorFranja({ area, reservaACambiar, onListo, onCancelar }) {
     });
     if (!res.isConfirmed) return;
     try {
-      const cuerpo = { area: area.id, fecha, hora_inicio: franja.hora_inicio };
+      const cuerpo = {
+        area: area.id, fecha, hora_inicio: franja.hora_inicio,
+        cantidad_personas: Number(cantidad),
+      };
       if (reservaACambiar) {
         await apiPut(`/reservas/${reservaACambiar.id}/`, cuerpo);
         avisoExito(t("res.reserva_cambiada"));
@@ -348,17 +445,28 @@ function SelectorFranja({ area, reservaACambiar, onListo, onCancelar }) {
         <div className="table-empty">{t("res.sin_franjas")}</div>
       ) : (
         <div className="res-franjas">
-          {franjas.map((f) => (
-            <button
-              key={f.hora_inicio}
-              className={"res-franja" + (f.libre ? "" : " ocupada")}
-              disabled={!f.libre}
-              onClick={() => elegir(f)}
-            >
-              {f.hora_inicio}–{f.hora_fin}
-              <span>{f.libre ? t("res.libre") : t("res.ocupada")}</span>
-            </button>
-          ))}
+          {franjas.map((f) => {
+            const libre = f.cupo_disponible > 0;
+            const parcial = libre && f.cupo_disponible < CUPO_MAX;
+            return (
+              <button
+                key={f.hora_inicio}
+                className={"res-franja" + (libre ? (parcial ? " parcial" : "") : " ocupada")}
+                disabled={!libre}
+                onClick={() => elegir(f)}
+              >
+                {f.hora_inicio}–{f.hora_fin}
+                <span className="res-franja-cupos">
+                  {Array.from({ length: CUPO_MAX }, (_, i) => (
+                    <i key={i} className={i < CUPO_MAX - f.cupo_disponible ? "ocupado" : ""} />
+                  ))}
+                </span>
+                <span>
+                  {libre ? t("res.cupos_disponibles", { n: f.cupo_disponible, total: CUPO_MAX }) : t("res.completo")}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

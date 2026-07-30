@@ -1,0 +1,128 @@
+/* ===== Inicio del portal del cliente ===== */
+
+.cli-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, #132f63, #1f4d94);
+  color: #fff;
+  border-radius: 14px;
+  padding: 22px 24px;
+  margin-bottom: 18px;
+}
+
+.cli-hero-icono {
+  font-size: 2rem;
+  color: #ffd166;
+}
+
+.cli-hero-titulo {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.cli-hero-sub {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: #cdd8ee;
+  text-transform: capitalize;
+}
+
+.cli-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.cli-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #d8e0ec;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.cli-stat-icono {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.cli-stat-icono.azul {
+  background: #1f6feb;
+}
+
+.cli-stat-icono.ambar {
+  background: #b8860b;
+}
+
+.cli-stat-icono.verde {
+  background: #1fa35c;
+}
+
+.cli-stat-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.cli-stat-valor {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #132f63;
+}
+
+.cli-accesos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.cli-acceso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #fff;
+  border: 1.5px solid #d8e0ec;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #132f63;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cli-acceso:hover {
+  border-color: #132f63;
+  background: #f5f8fc;
+}
+
+.cli-acceso span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .cli-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+}

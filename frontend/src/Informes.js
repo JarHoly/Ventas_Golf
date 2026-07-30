@@ -28,6 +28,8 @@ import {
 } from "recharts";
 import { apiGet, apiGetBlob } from "./api";
 import { mostrarError } from "./alertas";
+import { mesActual, mesPasado, rangoDeMes, fechaCorta, fmt, fmtSigno } from "./fechasInforme";
+import InformesComparativo from "./InformesComparativo";
 import "./Crud.css";
 import "./Informes.css";
 
@@ -45,39 +47,6 @@ const COLOR_METODO = {
   Tarjeta: ROJO,
   Sinpe: MORADO,
 };
-
-// ---------- Fechas ----------
-function mesActual() {
-  const h = new Date();
-  return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function mesPasado() {
-  const h = new Date();
-  const m = new Date(h.getFullYear(), h.getMonth() - 1, 1);
-  return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
-}
-
-// "2026-07" -> ["2026-07-01", "2026-07-31"] (el día 0 del mes siguiente
-// es el último día del mes elegido; truco clásico de la clase Date).
-function rangoDeMes(mes) {
-  const [anio, m] = mes.split("-").map(Number);
-  const ultimoDia = new Date(anio, m, 0).getDate();
-  return [`${mes}-01`, `${mes}-${String(ultimoDia).padStart(2, "0")}`];
-}
-
-function fechaCorta(iso) {
-  const [a, m, d] = iso.split("-");
-  return `${d}/${m}/${a}`;
-}
-
-// ---------- Formato de dinero (igual que el PDF: negativos entre paréntesis) ----------
-const fmt = (v) =>
-  Math.abs(v).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-const fmtSigno = (v) => (v < 0 ? `(${fmt(v)})` : fmt(v));
 
 // ---------- Variación vs período anterior ----------
 // invertir=true para GASTOS: que suban es malo (rojo), que bajen es bueno.
@@ -119,6 +88,7 @@ function Tarjeta({ icono, color, etiqueta, valor, children }) {
 }
 
 export default function Informes() {
+  const [vista, setVista] = useState("resumen"); // "resumen" | "comparativo"
   const [modo, setModo] = useState("mes"); // "mes" | "rango"
   const [mes, setMes] = useState(mesActual());
   const [desde, setDesde] = useState(rangoDeMes(mesActual())[0]);
@@ -184,17 +154,32 @@ export default function Informes() {
           <h1>Informes</h1>
         </div>
         <div className="page-actions">
-          <button
-            className="btn-primary"
-            onClick={descargarPdf}
-            disabled={!rangoValido || cargando || pdfCargando}
-          >
-            <FontAwesomeIcon icon={pdfCargando ? faSpinner : faFilePdf} spin={pdfCargando} />{" "}
-            Descargar PDF
-          </button>
+          {vista === "resumen" && (
+            <button
+              className="btn-primary"
+              onClick={descargarPdf}
+              disabled={!rangoValido || cargando || pdfCargando}
+            >
+              <FontAwesomeIcon icon={pdfCargando ? faSpinner : faFilePdf} spin={pdfCargando} />{" "}
+              Descargar PDF
+            </button>
+          )}
         </div>
       </div>
 
+      <div className="inf-modo" style={{ marginBottom: 16 }}>
+        <button className={vista === "resumen" ? "activo" : ""} onClick={() => setVista("resumen")}>
+          Resumen
+        </button>
+        <button className={vista === "comparativo" ? "activo" : ""} onClick={() => setVista("comparativo")}>
+          Comparativo
+        </button>
+      </div>
+
+      {vista === "comparativo" ? (
+        <InformesComparativo />
+      ) : (
+        <>
       {error && <div className="alert-error">{error}</div>}
 
       {/* ===== Filtros de período (una sola fila, arriba de todo) ===== */}
@@ -560,6 +545,8 @@ export default function Informes() {
               </div>
             </>
           )}
+        </>
+      )}
         </>
       )}
     </div>

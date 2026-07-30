@@ -23,7 +23,11 @@ from ventas.models import Persona, PerfilUsuario
 from ventas.permisos import (
     Autenticado, EsPersonal, PersonalOSoloLectura, SoloAdmin, es_cliente, es_personal,
 )
-from .models import AreaReserva, Notificacion, Reserva
+from django.conf import settings
+from django.db.models import Sum
+
+from .models import AreaReserva, CAPACIDAD_MAX_FRANJA, Notificacion, PushSubscription, Reserva
+from .push import enviar_push
 from .serializers import AreaReservaSerializer, NotificacionSerializer, ReservaSerializer
 
 MAX_COMPROBANTE_MB = 10
@@ -32,14 +36,17 @@ MAX_COMPROBANTE_MB = 10
 # ---------- Notificaciones internas: helpers ----------
 def _notificar(usuario, mensaje, reserva=None):
     Notificacion.objects.create(user=usuario, mensaje=mensaje, reserva=reserva)
+    enviar_push(usuario, mensaje)
 
 
 def _notificar_personal(mensaje, reserva=None):
     """Aviso para TODO el personal activo (admins y operativos)."""
-    personal = User.objects.filter(is_active=True).exclude(perfil__rol=PerfilUsuario.Rol.CLIENTE)
+    personal = list(User.objects.filter(is_active=True).exclude(perfil__rol=PerfilUsuario.Rol.CLIENTE))
     Notificacion.objects.bulk_create(
         [Notificacion(user=u, mensaje=mensaje, reserva=reserva) for u in personal]
     )
+    for u in personal:
+        enviar_push(u, mensaje)
 
 
 def _etiqueta(reserva):
@@ -82,21 +89,27 @@ def disponibilidad(request):
             {"detail": "Parámetros requeridos: ?area=ID&fecha=YYYY-MM-DD."},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    # Una franja está ocupada si tiene una reserva pendiente o aceptada
-    # (las rechazadas liberan el espacio).
-    ocupadas = set(
-        Reserva.objects.filter(area=area, fecha=fecha)
-        .exclude(estado=Reserva.Estado.RECHAZADA)
-        .values_list("hora_inicio", flat=True)
-    )
+    # Personas ya anotadas por franja (pendiente o aceptada; las rechazadas
+    # liberan el cupo). Varias reservas pueden compartir una franja mientras
+    # la suma no supere CAPACIDAD_MAX_FRANJA.
+    ocupadas = {
+        fila["hora_inicio"]: fila["personas"]
+        for fila in (
+            Reserva.objects.filter(area=area, fecha=fecha)
+            .exclude(estado=Reserva.Estado.RECHAZADA)
+            .values("hora_inicio")
+            .annotate(personas=Sum("cantidad_personas"))
+        )
+    }
     return Response({
         "area": area.id,
         "fecha": fecha.isoformat(),
+        "cupo_total": CAPACIDAD_MAX_FRANJA,
         "franjas": [
             {
                 "hora_inicio": ini.strftime("%H:%M"),
                 "hora_fin": fin.strftime("%H:%M"),
-                "libre": ini not in ocupadas,
+                "cupo_disponible": max(0, CAPACIDAD_MAX_FRANJA - ocupadas.get(ini, 0)),
             }
             for ini, fin in area.franjas()
         ],
@@ -121,9 +134,11 @@ class ReservaViewSet(viewsets.ModelViewSet):
             qs = qs.filter(fecha=fecha)
         return qs
 
-    def _validar_franja(self, area, fecha, hora_inicio, excluir_pk=None):
+    def _validar_franja(self, area, fecha, hora_inicio, cantidad_personas, excluir_pk=None):
         """Devuelve (hora_fin, error). Chequea que la franja exista en el
-        horario del área y que nadie más la tenga tomada."""
+        horario del área y que quede cupo suficiente: varias reservas pueden
+        compartir una franja mientras la suma de personas no pase de
+        CAPACIDAD_MAX_FRANJA."""
         if not area.activa:
             return None, "Esa área no está disponible."
         if fecha < timezone.localdate():
@@ -131,14 +146,17 @@ class ReservaViewSet(viewsets.ModelViewSet):
         hora_fin = next((fin for ini, fin in area.franjas() if ini == hora_inicio), None)
         if hora_fin is None:
             return None, "Esa hora no corresponde a una franja válida del área."
-        choque = (
+        ocupadas = (
             Reserva.objects.filter(area=area, fecha=fecha, hora_inicio=hora_inicio)
             .exclude(estado=Reserva.Estado.RECHAZADA)
             .exclude(pk=excluir_pk)
-            .exists()
+            .aggregate(personas=Sum("cantidad_personas"))["personas"] or 0
         )
-        if choque:
-            return None, "Esa franja ya está reservada. Elegí otra."
+        cupo_disponible = CAPACIDAD_MAX_FRANJA - ocupadas
+        if cantidad_personas > cupo_disponible:
+            if cupo_disponible <= 0:
+                return None, "Esa franja ya no tiene cupo disponible. Elegí otra."
+            return None, f"Esa franja solo tiene cupo para {cupo_disponible} persona(s) más."
         return hora_fin, None
 
     def perform_create(self, serializer):
@@ -147,7 +165,8 @@ class ReservaViewSet(viewsets.ModelViewSet):
         datos = serializer.validated_data
         with transaction.atomic():
             hora_fin, error = self._validar_franja(
-                datos["area"], datos["fecha"], datos["hora_inicio"]
+                datos["area"], datos["fecha"], datos["hora_inicio"],
+                datos.get("cantidad_personas", 1),
             )
             if error:
                 raise _error(error)
@@ -168,7 +187,10 @@ class ReservaViewSet(viewsets.ModelViewSet):
             area = datos.get("area", reserva.area)
             fecha = datos.get("fecha", reserva.fecha)
             hora = datos.get("hora_inicio", reserva.hora_inicio)
-            hora_fin, error = self._validar_franja(area, fecha, hora, excluir_pk=reserva.pk)
+            cantidad_personas = datos.get("cantidad_personas", reserva.cantidad_personas)
+            hora_fin, error = self._validar_franja(
+                area, fecha, hora, cantidad_personas, excluir_pk=reserva.pk
+            )
             if error:
                 raise _error(error)
             # Al cambiarla vuelve a PENDIENTE: el personal debe revisarla de nuevo.
@@ -266,11 +288,63 @@ def mis_notificaciones(request):
     })
 
 
+# ---------- Notificaciones push nativas (Web Push) ----------
+@api_view(["GET"])
+@permission_classes([Autenticado])
+def push_clave_publica(request):
+    """GET /api/push/clave-publica/ -> la clave VAPID pública (el frontend
+    la necesita para pedir la suscripción del navegador)."""
+    return Response({"public_key": settings.VAPID_PUBLIC_KEY})
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([Autenticado])
+def push_suscripcion(request):
+    """
+    POST   {"endpoint", "keys": {"p256dh", "auth"}} -> guarda/actualiza la
+           suscripción de ESTE dispositivo para el usuario logueado.
+    DELETE {"endpoint"} -> la borra (el usuario desactivó las notificaciones).
+    """
+    if request.method == "DELETE":
+        endpoint = request.data.get("endpoint")
+        if endpoint:
+            PushSubscription.objects.filter(user=request.user, endpoint=endpoint).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    endpoint = request.data.get("endpoint")
+    claves = request.data.get("keys") or {}
+    if not endpoint or not claves.get("p256dh") or not claves.get("auth"):
+        return Response({"detail": "Suscripción incompleta."}, status=status.HTTP_400_BAD_REQUEST)
+    PushSubscription.objects.update_or_create(
+        endpoint=endpoint,
+        defaults={"user": request.user, "p256dh": claves["p256dh"], "auth": claves["auth"]},
+    )
+    return Response(status=status.HTTP_201_CREATED)
+
+
 @api_view(["POST"])
 @permission_classes([Autenticado])
 def marcar_leidas(request):
     request.user.notificaciones.filter(leida=False).update(leida=True)
     return Response({"no_leidas": 0})
+
+
+@api_view(["DELETE"])
+@permission_classes([Autenticado])
+def notificacion_borrar(request, notif_id):
+    """Borra UNA notificación propia (el usuario ya la leyó y no la quiere más)."""
+    borradas, _ = request.user.notificaciones.filter(pk=notif_id).delete()
+    if not borradas:
+        return Response({"detail": "Notificación no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["DELETE"])
+@permission_classes([Autenticado])
+def notificaciones_vaciar(request):
+    """Borra TODAS las notificaciones propias de una sola vez."""
+    request.user.notificaciones.all().delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ---------- Cuentas de clientes (las crea el personal) ----------

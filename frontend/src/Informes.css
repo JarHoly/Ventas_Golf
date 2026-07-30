@@ -149,6 +149,106 @@
   color: #132f63;
 }
 
+.inf-delta-grande {
+  font-size: 1rem;
+}
+
+/* ---- Tarjetas "duelo" del comparativo: dos barras A/B a escala ---- */
+.inf-duelo {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.inf-duelo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inf-duelo-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inf-duelo-tag {
+  flex: 0 0 auto;
+  width: 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.inf-duelo-tag.b {
+  color: #132f63;
+}
+
+.inf-duelo-track {
+  flex: 1;
+  height: 10px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.inf-duelo-barra {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.inf-duelo-num {
+  flex: 0 0 auto;
+  min-width: 78px;
+  text-align: right;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #22304a;
+}
+
+/* ---- Donas gemelas (A vs B) por método ---- */
+.inf-dona-duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.inf-dona-mini {
+  text-align: center;
+}
+
+.inf-dona-mini-titulo {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.inf-dona-mini-vacia {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  font-style: italic;
+  padding: 30px 0;
+}
+
+.inf-dona-duo-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.inf-cuadro-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
 /* ---- Cajas de gráficos ---- */
 .inf-charts {
   display: grid;

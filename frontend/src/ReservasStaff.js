@@ -69,7 +69,10 @@ export default function ReservasStaff() {
 
 // ===================== TAB: RESERVAS =====================
 function TabReservas() {
-  const [estado, setEstado] = useState("Pendiente");
+  // Arranca mostrando TODOS los estados: si defaultea a "Pendiente", las
+  // reservas ya aceptadas/rechazadas (el historial) quedan escondidas y
+  // parece que no se guardan.
+  const [estado, setEstado] = useState("");
   const [fecha, setFecha] = useState("");
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -174,6 +177,7 @@ function TabReservas() {
                 <th>Área</th>
                 <th>Fecha</th>
                 <th>Horario</th>
+                <th>Personas</th>
                 <th>Precio</th>
                 <th>Comprobante</th>
                 <th>Estado</th>
@@ -187,6 +191,7 @@ function TabReservas() {
                   <td>{r.area_nombre}</td>
                   <td>{fechaCorta(r.fecha)}</td>
                   <td>{hora(r.hora_inicio)} – {hora(r.hora_fin)}</td>
+                  <td className="num">{r.cantidad_personas}</td>
                   <td>${fmt(r.precio)}</td>
                   <td>
                     {r.tiene_comprobante ? (

@@ -25,6 +25,21 @@ SECRET_KEY = 'django-insecure-laa6@52i6hj!r5qm#fd8eg%f$m-itgy@*r&4u=w_c_@154b4is
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+# ----- Web Push (VAPID) -----
+# Notificaciones push nativas al celular (ver reservas/push.py). Mismo
+# criterio que SECRET_KEY por ahora: hardcodeadas acá, no por variable de
+# entorno (pendiente, junto con el resto del hardening de producción).
+# Generadas una sola vez con py_vapid — NO regenerar, o las suscripciones
+# de los celulares que ya se instalaron la app dejarían de funcionar.
+VAPID_PRIVATE_KEY = """-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgy1EuAA89/k2aqHcQ
+eUn+8XMtN/CVzZFXiudenJO8w2ShRANCAATpW0tc+M9mdZnPZ18ram10aRzhoUgo
++RsVFNuMj70+ZKrEgGYHmeKaWVxPlnrdl1az36PNFm/sumUbHeC5yO/d
+-----END PRIVATE KEY-----
+"""
+VAPID_PUBLIC_KEY = "BOlbS1z4z2Z1mc9nXytqbXRpHOGhSCj5GxUU24yPvT5kqsSAZgeZ4ppZXE-Wet2XVrPfo80Wb-y6ZRsd4LnI790"
+VAPID_CLAIMS_EMAIL = "mailto:soporte@corvana.net"
+
 # Hosts desde los que Django acepta peticiones. Si el dominio no está aquí,
 # Django responde 400 (DisallowedHost) por seguridad.
 ALLOWED_HOSTS = [

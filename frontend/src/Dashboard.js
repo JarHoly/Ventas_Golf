@@ -11,8 +11,10 @@ import {
   faMoneyBillTransfer,
   faChartPie,
   faCalendarCheck,
+  faHouse,
+  faMobileScreenButton,
 } from "@fortawesome/free-solid-svg-icons";
-import { apiGet, esAdmin, esCliente } from "./api";
+import { apiGet, esAdmin, esCliente, usuarioActual } from "./api";
 import PersonasSeccion from "./PersonasSeccion";
 import Categorias from "./Categorias";
 import Productos from "./Productos";
@@ -20,7 +22,9 @@ import Movimientos from "./Movimientos";
 import Informes from "./Informes";
 import ReservasStaff from "./ReservasStaff";
 import ReservasCliente from "./ReservasCliente";
+import ClienteInicio from "./ClienteInicio";
 import Notificaciones from "./Notificaciones";
+import { InstalarAppModal, InstalarAppSeccion, tutorialYaVisto, marcarTutorialVisto } from "./InstalarApp";
 import SelectorIdioma from "./SelectorIdioma";
 import { useIdioma } from "./i18n";
 import "./Dashboard.css";
@@ -43,14 +47,25 @@ const MENU_PERSONAL = [
 
 export default function Dashboard({ onLogout }) {
   const { t } = useIdioma();
-  // Los clientes SOLO ven su portal de reservas.
+  // Los clientes SOLO ven su portal: inicio, reservas y el tutorial de instalación.
   const MENU_CLIENTE = [
+    { id: "inicio", label: t("nav.inicio"), icon: faHouse },
     { id: "reservas-cliente", label: t("nav.mis_reservas"), icon: faCalendarCheck },
+    { id: "instalar-app", label: t("pwa.menu"), icon: faMobileScreenButton },
   ];
   const MENU = esCliente() ? MENU_CLIENTE : MENU_PERSONAL;
-  const [seccion, setSeccion] = useState(esCliente() ? "reservas-cliente" : "clientes");
+  const [seccion, setSeccion] = useState(esCliente() ? "inicio" : "clientes");
   // Filtro que la búsqueda global inyecta a la sección destino.
   const [filtroInicial, setFiltroInicial] = useState("");
+
+  // ===== Tutorial de "instalar como app": una sola vez, tras el primer login =====
+  const [mostrarTutorialPwa, setMostrarTutorialPwa] = useState(
+    () => esCliente() && !tutorialYaVisto(usuarioActual())
+  );
+  function cerrarTutorialPwa() {
+    marcarTutorialVisto(usuarioActual());
+    setMostrarTutorialPwa(false);
+  }
 
   // ===== Búsqueda global del navbar =====
   const [busqueda, setBusqueda] = useState("");
@@ -277,9 +292,13 @@ export default function Dashboard({ onLogout }) {
           {seccion === "movimientos" && <Movimientos />}
           {seccion === "informes" && <Informes />}
           {seccion === "reservas" && <ReservasStaff />}
+          {seccion === "inicio" && <ClienteInicio onIrA={irASeccion} />}
           {seccion === "reservas-cliente" && <ReservasCliente />}
+          {seccion === "instalar-app" && <InstalarAppSeccion />}
         </main>
       </div>
+
+      {mostrarTutorialPwa && <InstalarAppModal onClose={cerrarTutorialPwa} />}
     </div>
   );
 }

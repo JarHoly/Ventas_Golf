@@ -159,6 +159,15 @@
   font-weight: 600;
 }
 
+.res-area-cupo {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
 /* Selector de fecha + franjas */
 .res-selector {
   background: #fff;
@@ -202,25 +211,59 @@
 .res-franja {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   align-items: center;
-  padding: 9px 6px;
+  padding: 10px 6px;
   border: 1.5px solid #cfe0d8;
   background: #f2faf5;
   color: #14713f;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 700;
   font-size: 0.85rem;
   cursor: pointer;
+  transition: transform 0.1s, border-color 0.15s;
 }
 
 .res-franja span {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 500;
 }
 
 .res-franja:hover:not(:disabled) {
   border-color: #14713f;
+  transform: translateY(-1px);
+}
+
+.res-franja-cupos {
+  display: flex;
+  gap: 3px;
+}
+
+.res-franja-cupos i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #14713f;
+  display: inline-block;
+}
+
+.res-franja-cupos i.ocupado {
+  background: #cfe0d8;
+}
+
+/* Franja con cupo parcial: sigue disponible, pero avisa en ámbar. */
+.res-franja.parcial {
+  background: #fff8e8;
+  border-color: #f0d99a;
+  color: #8a6100;
+}
+
+.res-franja.parcial .res-franja-cupos i {
+  background: #b8860b;
+}
+
+.res-franja.parcial .res-franja-cupos i.ocupado {
+  background: #f0e2bb;
 }
 
 .res-franja.ocupada {
@@ -230,11 +273,102 @@
   cursor: not-allowed;
 }
 
+.res-franja.ocupada .res-franja-cupos i {
+  background: #c4cbd6;
+}
+
 /* Mis reservas */
 .res-lista {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* ---- Tarjetas "boleto" de Mis reservas (rediseño) ---- */
+.res-tickets {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.res-ticket {
+  display: flex;
+  background: #fff;
+  border: 1px solid #d8e0ec;
+  border-left: 6px solid #94a3b8;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(16, 34, 61, 0.06);
+}
+
+.res-ticket-pendiente {
+  border-left-color: #d69e00;
+}
+
+.res-ticket-aceptada {
+  border-left-color: #1fa35c;
+}
+
+.res-ticket-rechazada {
+  border-left-color: #d62828;
+}
+
+.res-ticket.historial {
+  opacity: 0.82;
+}
+
+.res-ticket-fecha {
+  flex: 0 0 auto;
+  width: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f5f8fc;
+  border-right: 1px solid #e3eaf3;
+  padding: 10px 6px;
+}
+
+.res-ticket-dia {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #132f63;
+  line-height: 1;
+}
+
+.res-ticket-mes {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.res-ticket-cuerpo {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
+  min-width: 0;
+}
+
+.res-ticket-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.res-subtitulo-historial {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
 }
 
 .res-item {
@@ -345,6 +479,39 @@
   font-weight: 700;
   color: #132f63;
   border-bottom: 1px solid #eef2f7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notif-vaciar {
+  border: none;
+  background: none;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.notif-vaciar:hover {
+  color: #d62828;
+}
+
+.notif-borrar {
+  float: right;
+  border: none;
+  background: none;
+  color: #b8c2d1;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 0.78rem;
+}
+
+.notif-borrar:hover {
+  color: #d62828;
 }
 
 .notif-vacia {

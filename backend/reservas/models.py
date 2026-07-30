@@ -5,12 +5,17 @@ y notificaciones internas del sistema.
 from datetime import datetime, time, timedelta
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
 # Un cliente tiene 24 horas para adjuntar el comprobante de pago;
 # pasado ese plazo la reserva se marca como "posible inválida".
 HORAS_PLAZO_COMPROBANTE = 24
+
+# Cupo máximo de personas por franja (área + fecha + hora): varias reservas
+# pueden compartir la misma franja mientras no se pase de este total.
+CAPACIDAD_MAX_FRANJA = 4
 
 
 class AreaReserva(models.Model):
@@ -71,6 +76,13 @@ class Reserva(models.Model):
     fecha = models.DateField()
     hora_inicio = models.TimeField()
     hora_fin = models.TimeField()          # snapshot de la duración del área
+    # Cuántas personas juegan en esta reserva (1 a CAPACIDAD_MAX_FRANJA).
+    # Varias reservas pueden compartir una misma franja mientras la suma de
+    # personas no supere el cupo: ver ReservaViewSet._validar_franja.
+    cantidad_personas = models.PositiveSmallIntegerField(
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(CAPACIDAD_MAX_FRANJA)],
+    )
     precio = models.DecimalField(max_digits=12, decimal_places=2)  # snapshot
     comprobante = models.FileField(upload_to="comprobantes/%Y/%m/", blank=True)
     estado = models.CharField(max_length=10, choices=Estado.choices, default=Estado.PENDIENTE)
@@ -93,6 +105,26 @@ class Reserva(models.Model):
             and not self.comprobante
             and timezone.now() > self.creada_en + timedelta(hours=HORAS_PLAZO_COMPROBANTE)
         )
+
+
+class PushSubscription(models.Model):
+    """
+    Una suscripción de Web Push (un celular/navegador que aceptó recibir
+    notificaciones nativas). Un usuario puede tener varias (varios
+    dispositivos); 'endpoint' es único porque el navegador lo genera y
+    reinstalar/resuscribirse desde el mismo dispositivo debe REEMPLAZAR la
+    suscripción vieja, no duplicarla.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="push_subscriptions"
+    )
+    endpoint = models.URLField(max_length=500, unique=True)
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    creada_en = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} · {self.endpoint[:40]}..."
 
 
 class Notificacion(models.Model):

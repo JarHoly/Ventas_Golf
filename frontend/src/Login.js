@@ -31,6 +31,7 @@ export default function Login({ onLogin }) {
       const storage = remember ? localStorage : sessionStorage;
       storage.setItem("token", data.token);
       storage.setItem("nombre", data.nombre);
+      storage.setItem("username", data.username);
       // Guardamos el ROL para mostrar/ocultar secciones del dashboard.
       // Esto es solo estético: la seguridad real la valida el backend.
       storage.setItem("rol", data.rol || (data.is_staff ? "Admin" : "Operativo"));
