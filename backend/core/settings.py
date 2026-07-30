@@ -31,12 +31,11 @@ DEBUG = True
 # entorno (pendiente, junto con el resto del hardening de producción).
 # Generadas una sola vez con py_vapid — NO regenerar, o las suscripciones
 # de los celulares que ya se instalaron la app dejarían de funcionar.
-VAPID_PRIVATE_KEY = """-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgy1EuAA89/k2aqHcQ
-eUn+8XMtN/CVzZFXiudenJO8w2ShRANCAATpW0tc+M9mdZnPZ18ram10aRzhoUgo
-+RsVFNuMj70+ZKrEgGYHmeKaWVxPlnrdl1az36PNFm/sumUbHeC5yO/d
------END PRIVATE KEY-----
-"""
+# OJO: py_vapid.Vapid.from_string() espera la clave privada en DER
+# codificada en base64url CRUDO (sin envoltorio PEM) — pasarle el texto
+# "-----BEGIN PRIVATE KEY-----...-----END-----" hace que falle al
+# deserializar (ValueError "ASN.1 parsing error: invalid length").
+VAPID_PRIVATE_KEY = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgy1EuAA89_k2aqHcQeUn-8XMtN_CVzZFXiudenJO8w2ShRANCAATpW0tc-M9mdZnPZ18ram10aRzhoUgo-RsVFNuMj70-ZKrEgGYHmeKaWVxPlnrdl1az36PNFm_sumUbHeC5yO_d"
 VAPID_PUBLIC_KEY = "BOlbS1z4z2Z1mc9nXytqbXRpHOGhSCj5GxUU24yPvT5kqsSAZgeZ4ppZXE-Wet2XVrPfo80Wb-y6ZRsd4LnI790"
 VAPID_CLAIMS_EMAIL = "mailto:soporte@corvana.net"
 

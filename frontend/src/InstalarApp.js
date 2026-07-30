@@ -184,13 +184,13 @@ export function NotificacionesPush() {
         </span>
         {t("pwa.push_titulo")}
       </h3>
-      <p className="form-hint" style={{ marginTop: 0 }}>{t("pwa.push_intro")}</p>
+      <p className="form-hint" style={{ marginTop: 0, marginBottom: 12 }}>{t("pwa.push_intro")}</p>
       {permisoDenegado() ? (
         <p className="pwa-push-denegado">
           <FontAwesomeIcon icon={faBellSlash} /> {t("pwa.push_denegado")}
         </p>
       ) : suscrito ? (
-        <button className="btn-secondary" onClick={desactivar} disabled={cargando}>
+        <button className="btn-secondary btn-wide" onClick={desactivar} disabled={cargando}>
           <FontAwesomeIcon icon={faBellSlash} /> {cargando ? "..." : t("pwa.push_desactivar")}
         </button>
       ) : (
