@@ -1202,18 +1202,23 @@ def pdf_rango_movimientos(request):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
         ("LINEABOVE", (0, -1), (-1, -1), 0.6, BORDE),
     ]))
+    # A diferencia del método de pago (siempre 4 filas fijas), las categorías
+    # las crea el negocio libremente en el CRUD y pueden ser muchas — la caja
+    # crece según haga falta para que TODAS quepan, sin recortar ninguna.
+    alto_filas_cat = max(118, 16 * len(filas_leyenda_cat) + 10)
     caja_ingresos = Table(
         [[_p("INGRESOS POR CATEGORÍA (USD)", 8.5, NAVY, negrita=True), ""],
          [_dona_categorias(ventas_por_categoria), leyenda_cat]],
         colWidths=[110, ancho_ingresos - 110],
-        rowHeights=[20, 118],
+        rowHeights=[20, alto_filas_cat],
     )
     caja_ingresos.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
         ("ROUNDEDCORNERS", [5, 5, 5, 5]),
         ("SPAN", (0, 0), (1, 0)),
-        ("VALIGN", (0, 1), (-1, 1), "MIDDLE"),
+        ("VALIGN", (0, 1), (-1, 1), "TOP"),
         ("TOPPADDING", (0, 0), (-1, 0), 7),
+        ("TOPPADDING", (0, 1), (-1, 1), 8),
     ]))
 
     fila_inferior = Table([[caja_dist, caja_ingresos]], colWidths=[W * 0.48, W * 0.52])
