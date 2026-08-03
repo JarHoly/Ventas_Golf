@@ -31,7 +31,7 @@ from xml.sax.saxutils import escape
 
 from django.utils import timezone
 
-from .models import Movimiento, CierreDia, ObservacionDia, Persona, Producto, Categoria
+from .models import Movimiento, CierreDia, ObservacionDia, Persona, Producto
 from .informes import calcular_informe, validar_rango, solo_personal_negocio, MAX_DIAS_SERIE_DIARIA
 
 EMPRESA = "E Cuestas CORP AMERICA C.R. S.A."
@@ -59,6 +59,14 @@ ZEBRA = colors.HexColor("#F5F8FC")
 
 COLOR_METODO = {"Transferencia": AZUL, "Efectivo": VERDE, "Tarjeta": ROJO, "Sinpe": MORADO}
 METODOS = ["Transferencia", "Efectivo", "Tarjeta", "Sinpe"]
+
+# Las categorías las crea el usuario en el CRUD (no son un set fijo como los
+# métodos de pago), así que se les asigna color de esta paleta por orden,
+# ciclando si hay más categorías que colores.
+PALETA_CATEGORIAS = [
+    AZUL_CLARO, VERDE, MORADO, AZUL,
+    colors.HexColor("#F2A93B"), colors.HexColor("#E85D9E"), GRIS,
+]
 
 
 def _fmt(valor, negativo=False):
@@ -222,6 +230,27 @@ def _dona_metodos(neto_por_metodo):
     dona.slices.strokeWidth = 1
     for i, (m, _) in enumerate(datos):
         dona.slices[i].fillColor = COLOR_METODO[m]
+    d.add(dona)
+    return d
+
+
+def _dona_categorias(ventas_por_categoria):
+    """Dona de ingresos por categoría (tamaño de porción = monto de ventas)."""
+    d = Drawing(95, 95)
+    datos = [(c, v) for c, v in ventas_por_categoria if v > 0]
+    if not datos:
+        d.add(String(47, 45, "Sin datos", fontName=F_NORMAL, fontSize=7, fillColor=GRIS,
+                     textAnchor="middle"))
+        return d
+    dona = Pie()
+    dona.x, dona.y = 10, 10
+    dona.width = dona.height = 75
+    dona.data = [float(v) for _, v in datos]
+    dona.innerRadiusFraction = 0.45
+    dona.slices.strokeColor = colors.white
+    dona.slices.strokeWidth = 1
+    for i in range(len(datos)):
+        dona.slices[i].fillColor = PALETA_CATEGORIAS[i % len(PALETA_CATEGORIAS)]
     d.add(dona)
     return d
 
@@ -907,7 +936,7 @@ def _movimientos_filtrados(request):
     qp = request.query_params
     qs = (
         Movimiento.objects.filter(fecha__range=(qp.get("desde"), qp.get("hasta")))
-        .select_related("persona", "producto")
+        .select_related("persona", "producto", "producto__categoria")
         .order_by("fecha", "numero")
     )
     if qp.get("persona"):
@@ -961,32 +990,6 @@ def _serie_desde_movimientos(movimientos, desde, hasta):
     return puntos, ("dia" if por_dia else "mes")
 
 
-def _resumen_filtros(request):
-    """Texto legible de los filtros activos, para dejar constancia en el PDF
-    de exactamente qué se filtró (mismos filtros del panel de Movimientos)."""
-    qp = request.query_params
-    partes = []
-    if qp.get("persona"):
-        p = Persona.objects.filter(id=qp["persona"]).first()
-        if p:
-            partes.append(f"Persona: {p.codigo} · {p.nombre}")
-    if qp.get("producto"):
-        p = Producto.objects.filter(id=qp["producto"]).first()
-        if p:
-            partes.append(f"Producto: {p.nombre}")
-    if qp.get("metodo"):
-        partes.append(f"Método: {qp['metodo']}")
-    if qp.get("categoria"):
-        c = Categoria.objects.filter(id=qp["categoria"]).first()
-        if c:
-            partes.append(f"Categoría: {c.nombre}")
-    if qp.get("monto_min"):
-        partes.append(f"Monto mín: {qp['monto_min']}")
-    if qp.get("monto_max"):
-        partes.append(f"Monto máx: {qp['monto_max']}")
-    return partes
-
-
 @api_view(["GET"])
 def pdf_rango_movimientos(request):
     """GET /api/reportes/rango/pdf/?desde=&hasta=&persona=&producto=&metodo=&categoria=&monto_min=&monto_max=
@@ -1015,6 +1018,19 @@ def pdf_rango_movimientos(request):
         if mv.moneda != "USD":
             continue
         neto_por_metodo[mv.metodo] += mv.total if mv.tipo == "Venta" else -mv.total
+
+    # Ingresos por categoría (solo Ventas en USD, mismo criterio de las demás
+    # gráficas de este PDF): cuánto vendió cada categoría, ordenado de mayor
+    # a menor, para ver de un vistazo en qué se concentran los ingresos.
+    ventas_por_categoria_dict = {}
+    for mv in movimientos:
+        if mv.tipo != "Venta" or mv.moneda != "USD":
+            continue
+        nombre_cat = mv.producto.categoria.nombre
+        ventas_por_categoria_dict[nombre_cat] = ventas_por_categoria_dict.get(nombre_cat, 0) + mv.total
+    ventas_por_categoria = sorted(
+        ventas_por_categoria_dict.items(), key=lambda par: par[1], reverse=True
+    )
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -1159,27 +1175,48 @@ def pdf_rango_movimientos(request):
         ("TOPPADDING", (0, 0), (-1, 0), 7),
     ]))
 
-    ancho_filtros = W * 0.52 - 6
-    filtros_activos = _resumen_filtros(request)
-    filas_filtros = [[_p("FILTROS APLICADOS", 8.5, NAVY, negrita=True)]]
-    if filtros_activos:
-        for texto in filtros_activos:
-            filas_filtros.append([_p(escape(texto), 8, leading=11)])
-        while len(filas_filtros) < 6:
-            filas_filtros.append([""])
+    ancho_ingresos = W * 0.52 - 6
+    ventas_totales_usd = sum(v for _, v in ventas_por_categoria)
+    filas_leyenda_cat = []
+    for i, (nombre_cat, v) in enumerate(ventas_por_categoria):
+        pct = (float(v) / float(ventas_totales_usd) * 100) if ventas_totales_usd else 0
+        cuadro = Drawing(8, 8)
+        cuadro.add(Rect(0, 0, 8, 8, fillColor=PALETA_CATEGORIAS[i % len(PALETA_CATEGORIAS)], strokeColor=None))
+        filas_leyenda_cat.append([
+            cuadro, _p(escape(nombre_cat), 8, leading=10),
+            _p(_fmt(v), 8, alin=2),
+            _p(f"{pct:.2f}%", 8, NAVY, negrita=True, alin=2),
+        ])
+    if not ventas_por_categoria:
+        filas_leyenda_cat.append(["", _p("Sin ventas en el período.", 8, GRIS, italica=True), "", ""])
     else:
-        filas_filtros.append([_p("Ninguno: se incluyen todos los movimientos del período.", 8, GRIS, italica=True)])
-        filas_filtros += [[""] for _ in range(4)]
-    caja_filtros = Table(filas_filtros, colWidths=[ancho_filtros], rowHeights=[18] + [24] * 5)
-    caja_filtros.setStyle(TableStyle([
+        filas_leyenda_cat.append([
+            "", _p("TOTAL", 8, negrita=True),
+            _p(_fmt(ventas_totales_usd), 8, negrita=True, alin=2),
+            _p("100.00%", 8, NAVY, negrita=True, alin=2),
+        ])
+    leyenda_cat = Table(filas_leyenda_cat, colWidths=[14, 90, 62, 48])
+    leyenda_cat.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ("LINEABOVE", (0, -1), (-1, -1), 0.6, BORDE),
+    ]))
+    caja_ingresos = Table(
+        [[_p("INGRESOS POR CATEGORÍA (USD)", 8.5, NAVY, negrita=True), ""],
+         [_dona_categorias(ventas_por_categoria), leyenda_cat]],
+        colWidths=[110, ancho_ingresos - 110],
+        rowHeights=[20, 118],
+    )
+    caja_ingresos.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.8, BORDE),
         ("ROUNDEDCORNERS", [5, 5, 5, 5]),
-        ("TOPPADDING", (0, 0), (0, 0), 6),
-        ("TOPPADDING", (0, 1), (0, -1), 3),
-        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("SPAN", (0, 0), (1, 0)),
+        ("VALIGN", (0, 1), (-1, 1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, 0), 7),
     ]))
 
-    fila_inferior = Table([[caja_dist, caja_filtros]], colWidths=[W * 0.48, W * 0.52])
+    fila_inferior = Table([[caja_dist, caja_ingresos]], colWidths=[W * 0.48, W * 0.52])
     fila_inferior.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
