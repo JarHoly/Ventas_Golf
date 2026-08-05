@@ -579,6 +579,77 @@ def pdf_resumen_dia(request, fecha):
     ]))
     elementos.append(fila_inferior)
 
+    # ============ RESUMEN DE PRODUCTOS ============
+    # Mismo criterio que la dona: solo Ventas en USD (los gastos son de
+    # proveedores, no tiene sentido mezclarlos con lo vendido al cliente).
+    metodos_resumen = ["Tarjeta", "Efectivo", "Transferencia", "Sinpe"]
+    resumen_productos_dict = {}
+    for m in movimientos:
+        if m.tipo != "Venta" or m.moneda != "USD":
+            continue
+        fila_prod = resumen_productos_dict.setdefault(
+            m.producto.nombre, {"cantidad": 0, "metodos": {met: 0 for met in metodos_resumen}}
+        )
+        fila_prod["cantidad"] += m.cantidad
+        fila_prod["metodos"][m.metodo] += m.total
+    resumen_productos = sorted(
+        (
+            {"producto": p, **d, "total": sum(d["metodos"].values())}
+            for p, d in resumen_productos_dict.items()
+        ),
+        key=lambda r: r["total"], reverse=True,
+    )
+
+    if resumen_productos:
+        banda_prod = Table(
+            [[_p("RESUMEN DE PRODUCTOS", 9, colors.white, negrita=True, alin=1)]], colWidths=[W]
+        )
+        banda_prod.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+
+        def _celda_metodo(v):
+            return _fmt(v) if v else "-"
+
+        datos_prod = [["Producto", "Cantidad"] + metodos_resumen]
+        for r in resumen_productos:
+            datos_prod.append([
+                _p(escape(r["producto"]), 7.5, leading=8.5), str(r["cantidad"]),
+                *[_celda_metodo(r["metodos"][met]) for met in metodos_resumen],
+            ])
+        totales_metodo = {met: sum(r["metodos"][met] for r in resumen_productos) for met in metodos_resumen}
+        datos_prod.append([
+            "TOTAL", str(sum(r["cantidad"] for r in resumen_productos)),
+            *[_celda_metodo(totales_metodo[met]) for met in metodos_resumen],
+        ])
+
+        fila_total_prod = len(datos_prod) - 1
+        anchos_prod = [0.40, 0.12, 0.12, 0.12, 0.12, 0.12]
+        tabla_prod = Table(datos_prod, colWidths=[W * a for a in anchos_prod], repeatRows=1)
+        tabla_prod.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, -1), F_NORMAL),
+            ("FONTNAME", (0, 0), (-1, 0), F_NEGRITA),
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+            ("GRID", (0, 0), (-1, -1), 0.4, BORDE),
+            ("ROWBACKGROUNDS", (0, 1), (-1, fila_total_prod - 1), [colors.white, ZEBRA]),
+            ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("BACKGROUND", (0, fila_total_prod), (-1, fila_total_prod), NAVY),
+            ("TEXTCOLOR", (0, fila_total_prod), (-1, fila_total_prod), colors.white),
+            ("FONTNAME", (0, fila_total_prod), (-1, fila_total_prod), F_NEGRITA),
+        ]))
+
+        elementos.append(Spacer(1, 4 * mm))
+        elementos.append(banda_prod)
+        elementos.append(tabla_prod)
+
     # La tabla de detalle va al final: fluye a las páginas que necesite
     # (su cabecera se repite en cada página gracias a repeatRows=1).
     elementos.append(Spacer(1, 4 * mm))

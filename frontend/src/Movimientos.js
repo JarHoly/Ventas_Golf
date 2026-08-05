@@ -13,6 +13,7 @@ import {
   faLockOpen,
   faFlagCheckered,
   faNoteSticky,
+  faBoxOpen,
 } from "@fortawesome/free-solid-svg-icons";
 import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
@@ -279,6 +280,39 @@ export default function Movimientos() {
   const totalGastos = sumaPor("Gasto", "USD");
   const totalVentasCRC = sumaPor("Venta", "CRC");
   const totalGastosCRC = sumaPor("Gasto", "CRC");
+
+  // Resumen de productos (solo día único): cuánto se vendió de cada producto
+  // y por cuál método de pago. Solo Ventas en USD — los gastos son de
+  // proveedores y no tiene sentido mezclarlos acá, mismo criterio que la
+  // dona de distribución por método.
+  const resumenProductos = (() => {
+    const porProducto = {};
+    visibles
+      .filter((m) => m.tipo === "Venta" && m.moneda === "USD")
+      .forEach((m) => {
+        if (!porProducto[m.producto_nombre]) {
+          porProducto[m.producto_nombre] = { cantidad: 0, metodos: {} };
+        }
+        const fila = porProducto[m.producto_nombre];
+        fila.cantidad += Number(m.cantidad);
+        fila.metodos[m.metodo] = (fila.metodos[m.metodo] || 0) + Number(m.total);
+      });
+    return Object.entries(porProducto)
+      .map(([producto, datos]) => ({
+        producto,
+        ...datos,
+        total: Object.values(datos.metodos).reduce((s, v) => s + v, 0),
+      }))
+      .sort((a, b) => b.total - a.total);
+  })();
+  const METODOS_RESUMEN = ["Tarjeta", "Efectivo", "Transferencia", "Sinpe"];
+  const totalesResumenProductos = {
+    cantidad: resumenProductos.reduce((s, r) => s + r.cantidad, 0),
+    metodos: METODOS_RESUMEN.reduce((acc, met) => {
+      acc[met] = resumenProductos.reduce((s, r) => s + (r.metodos[met] || 0), 0);
+      return acc;
+    }, {}),
+  };
 
   // Etiquetas para los selects con búsqueda.
   const opcionesPersona = personas.map((p) => ({ id: p.id, label: `${p.codigo} · ${p.nombre} (${p.tipo})` }));
@@ -568,6 +602,50 @@ export default function Movimientos() {
               </>
             ) : null}
           </span>
+        </div>
+      )}
+
+      {/* ===== Resumen de productos (también sale en el PDF del día) ===== */}
+      {modo === "dia" && !cargando && resumenProductos.length > 0 && (
+        <div className="table-card resumen-prod-card">
+          <div className="resumen-prod-head">
+            <h3>
+              <FontAwesomeIcon icon={faBoxOpen} /> Resumen de productos
+            </h3>
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                {METODOS_RESUMEN.map((met) => (
+                  <th key={met}>{met}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {resumenProductos.map((r) => (
+                <tr key={r.producto}>
+                  <td>{r.producto}</td>
+                  <td className="num">{r.cantidad}</td>
+                  {METODOS_RESUMEN.map((met) => (
+                    <td className="num" key={met}>
+                      {r.metodos[met] ? `$${fmt(r.metodos[met])}` : "-"}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              <tr className="resumen-prod-total">
+                <td>TOTAL</td>
+                <td className="num">{totalesResumenProductos.cantidad}</td>
+                {METODOS_RESUMEN.map((met) => (
+                  <td className="num" key={met}>
+                    {totalesResumenProductos.metodos[met] ? `$${fmt(totalesResumenProductos.metodos[met])}` : "-"}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
 

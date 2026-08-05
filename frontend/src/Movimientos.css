@@ -221,6 +221,26 @@
   }
 }
 
+/* ===== Resumen de productos (se imprime en el PDF) ===== */
+.resumen-prod-card {
+  margin-top: 14px;
+}
+.resumen-prod-head {
+  padding: 12px 16px 0;
+}
+.resumen-prod-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #132f63;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.resumen-prod-total td {
+  font-weight: 700;
+  border-top: 2px solid #132f63;
+}
+
 /* ===== Observaciones del día (se imprimen en el PDF) ===== */
 .obs-card {
   margin-top: 14px;
