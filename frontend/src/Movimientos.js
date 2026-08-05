@@ -282,34 +282,42 @@ export default function Movimientos() {
   const totalGastosCRC = sumaPor("Gasto", "CRC");
 
   // Resumen de productos (solo día único): cuánto se vendió de cada producto
-  // y por cuál método de pago. Solo Ventas en USD — los gastos son de
+  // y por cuál método de pago — cantidad Y monto separados POR método (no
+  // solo un total general), para poder ver cuánto de esa cantidad fue en
+  // efectivo, cuánto en tarjeta, etc. Solo Ventas en USD — los gastos son de
   // proveedores y no tiene sentido mezclarlos acá, mismo criterio que la
   // dona de distribución por método.
+  const METODOS_RESUMEN = ["Tarjeta", "Efectivo", "Transferencia", "Sinpe"];
   const resumenProductos = (() => {
     const porProducto = {};
     visibles
       .filter((m) => m.tipo === "Venta" && m.moneda === "USD")
       .forEach((m) => {
         if (!porProducto[m.producto_nombre]) {
-          porProducto[m.producto_nombre] = { cantidad: 0, metodos: {} };
+          porProducto[m.producto_nombre] = { metodos: {} };
         }
-        const fila = porProducto[m.producto_nombre];
-        fila.cantidad += Number(m.cantidad);
-        fila.metodos[m.metodo] = (fila.metodos[m.metodo] || 0) + Number(m.total);
+        const fila = porProducto[m.producto_nombre].metodos;
+        if (!fila[m.metodo]) fila[m.metodo] = { cantidad: 0, monto: 0 };
+        fila[m.metodo].cantidad += Number(m.cantidad);
+        fila[m.metodo].monto += Number(m.total);
       });
     return Object.entries(porProducto)
-      .map(([producto, datos]) => ({
-        producto,
-        ...datos,
-        total: Object.values(datos.metodos).reduce((s, v) => s + v, 0),
-      }))
+      .map(([producto, datos]) => {
+        // La cantidad y el monto totales del producto son la SUMA de lo que
+        // haya en cada método: así queda claro que ambos números coinciden.
+        const cantidad = Object.values(datos.metodos).reduce((s, v) => s + v.cantidad, 0);
+        const total = Object.values(datos.metodos).reduce((s, v) => s + v.monto, 0);
+        return { producto, metodos: datos.metodos, cantidad, total };
+      })
       .sort((a, b) => b.total - a.total);
   })();
-  const METODOS_RESUMEN = ["Tarjeta", "Efectivo", "Transferencia", "Sinpe"];
   const totalesResumenProductos = {
     cantidad: resumenProductos.reduce((s, r) => s + r.cantidad, 0),
     metodos: METODOS_RESUMEN.reduce((acc, met) => {
-      acc[met] = resumenProductos.reduce((s, r) => s + (r.metodos[met] || 0), 0);
+      acc[met] = {
+        cantidad: resumenProductos.reduce((s, r) => s + (r.metodos[met]?.cantidad || 0), 0),
+        monto: resumenProductos.reduce((s, r) => s + (r.metodos[met]?.monto || 0), 0),
+      };
       return acc;
     }, {}),
   };
@@ -613,13 +621,13 @@ export default function Movimientos() {
               <FontAwesomeIcon icon={faBoxOpen} /> Resumen de productos
             </h3>
           </div>
-          <table className="data-table">
+          <table className="data-table tabla-resumen-prod">
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Cantidad</th>
+                <th className="num">Cantidad</th>
                 {METODOS_RESUMEN.map((met) => (
-                  <th key={met}>{met}</th>
+                  <th className="num" key={met}>{met}</th>
                 ))}
               </tr>
             </thead>
@@ -630,7 +638,7 @@ export default function Movimientos() {
                   <td className="num">{r.cantidad}</td>
                   {METODOS_RESUMEN.map((met) => (
                     <td className="num" key={met}>
-                      {r.metodos[met] ? `$${fmt(r.metodos[met])}` : "-"}
+                      {r.metodos[met] ? `${r.metodos[met].cantidad} · $${fmt(r.metodos[met].monto)}` : "-"}
                     </td>
                   ))}
                 </tr>
@@ -640,7 +648,9 @@ export default function Movimientos() {
                 <td className="num">{totalesResumenProductos.cantidad}</td>
                 {METODOS_RESUMEN.map((met) => (
                   <td className="num" key={met}>
-                    {totalesResumenProductos.metodos[met] ? `$${fmt(totalesResumenProductos.metodos[met])}` : "-"}
+                    {totalesResumenProductos.metodos[met].cantidad
+                      ? `${totalesResumenProductos.metodos[met].cantidad} · $${fmt(totalesResumenProductos.metodos[met].monto)}`
+                      : "-"}
                   </td>
                 ))}
               </tr>

@@ -582,20 +582,26 @@ def pdf_resumen_dia(request, fecha):
     # ============ RESUMEN DE PRODUCTOS ============
     # Mismo criterio que la dona: solo Ventas en USD (los gastos son de
     # proveedores, no tiene sentido mezclarlos con lo vendido al cliente).
+    # Cantidad Y monto se llevan POR método (no un total general), para ver
+    # cuánta de esa cantidad fue en efectivo, cuánta en tarjeta, etc.
     metodos_resumen = ["Tarjeta", "Efectivo", "Transferencia", "Sinpe"]
     resumen_productos_dict = {}
     for m in movimientos:
         if m.tipo != "Venta" or m.moneda != "USD":
             continue
-        fila_prod = resumen_productos_dict.setdefault(
-            m.producto.nombre, {"cantidad": 0, "metodos": {met: 0 for met in metodos_resumen}}
-        )
-        fila_prod["cantidad"] += m.cantidad
-        fila_prod["metodos"][m.metodo] += m.total
+        metodos_prod = resumen_productos_dict.setdefault(m.producto.nombre, {})
+        fila_met = metodos_prod.setdefault(m.metodo, {"cantidad": 0, "monto": 0})
+        fila_met["cantidad"] += m.cantidad
+        fila_met["monto"] += m.total
     resumen_productos = sorted(
         (
-            {"producto": p, **d, "total": sum(d["metodos"].values())}
-            for p, d in resumen_productos_dict.items()
+            {
+                "producto": p,
+                "metodos": metodos_prod,
+                "cantidad": sum(v["cantidad"] for v in metodos_prod.values()),
+                "total": sum(v["monto"] for v in metodos_prod.values()),
+            }
+            for p, metodos_prod in resumen_productos_dict.items()
         ),
         key=lambda r: r["total"], reverse=True,
     )
@@ -610,16 +616,24 @@ def pdf_resumen_dia(request, fecha):
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ]))
 
-        def _celda_metodo(v):
-            return _fmt(v) if v else "-"
+        def _celda_metodo(datos_met):
+            if not datos_met or not datos_met["cantidad"]:
+                return "-"
+            return f"{datos_met['cantidad']} · {_fmt(datos_met['monto'])}"
 
         datos_prod = [["Producto", "Cantidad"] + metodos_resumen]
         for r in resumen_productos:
             datos_prod.append([
                 _p(escape(r["producto"]), 7.5, leading=8.5), str(r["cantidad"]),
-                *[_celda_metodo(r["metodos"][met]) for met in metodos_resumen],
+                *[_celda_metodo(r["metodos"].get(met)) for met in metodos_resumen],
             ])
-        totales_metodo = {met: sum(r["metodos"][met] for r in resumen_productos) for met in metodos_resumen}
+        totales_metodo = {
+            met: {
+                "cantidad": sum(r["metodos"].get(met, {}).get("cantidad", 0) for r in resumen_productos),
+                "monto": sum(r["metodos"].get(met, {}).get("monto", 0) for r in resumen_productos),
+            }
+            for met in metodos_resumen
+        }
         datos_prod.append([
             "TOTAL", str(sum(r["cantidad"] for r in resumen_productos)),
             *[_celda_metodo(totales_metodo[met]) for met in metodos_resumen],

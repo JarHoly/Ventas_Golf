@@ -83,6 +83,13 @@
   text-align: right;
   white-space: nowrap;
 }
+/* .data-table th ya trae text-align:left con más especificidad que .num
+   (elemento+clase vs. clase sola) — sin esto, los encabezados numéricos se
+   quedan pegados a la izquierda mientras los valores se van a la derecha,
+   dando esa sensación de tabla "corrida". */
+.data-table th.num {
+  text-align: right;
+}
 .tabla-movs {
   min-width: 960px; /* muchas columnas: en pantallas chicas se desliza */
 }
@@ -235,6 +242,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+/* La columna de producto se queda con el espacio que sobra; las de
+   cantidad/método no necesitan tanto ancho como para dejar los montos
+   flotando lejos del encabezado. */
+.tabla-resumen-prod th:not(:first-child),
+.tabla-resumen-prod td:not(:first-child) {
+  width: 13%;
+  white-space: nowrap;
 }
 .resumen-prod-total td {
   font-weight: 700;
