@@ -228,6 +228,43 @@
   }
 }
 
+/* ===== Aviso de usos de carrito en el modal de movimientos ===== */
+.aviso-carrito {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid;
+  font-size: 0.83rem;
+  line-height: 1.35;
+}
+/* Rojo: ya se pasó del límite o la membresía está vencida. */
+.aviso-carrito.alerta {
+  background: #fdecec;
+  border-color: #f3c2c2;
+  color: #b21f1f;
+}
+/* Ámbar: todavía le quedan, pero ESTE movimiento lo pasaría. */
+.aviso-carrito.atencion {
+  background: #fff8e8;
+  border-color: #f0d99a;
+  color: #8a6100;
+}
+/* Verde: le quedan usos de sobra. */
+.aviso-carrito.ok {
+  background: #f2faf5;
+  border-color: #cfe0d8;
+  color: #14713f;
+}
+/* Gris: no tiene membresía, no aplica el control. */
+.aviso-carrito.neutro {
+  background: #f5f8fc;
+  border-color: #d8e0ec;
+  color: #64748b;
+}
+
 /* ===== Resumen de productos (se imprime en el PDF) ===== */
 .resumen-prod-card {
   margin-top: 14px;

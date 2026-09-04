@@ -11,6 +11,7 @@ from .views import (
 )
 from .reportes import pdf_resumen_dia, pdf_informe, pdf_rango_movimientos
 from .informes import informe_resumen
+from .membresias import estado_membresia_view
 
 # El router arma solas todas las rutas del CRUD de cada recurso.
 router = DefaultRouter()
@@ -22,6 +23,7 @@ router.register("movimientos", MovimientoViewSet, basename="movimiento")
 urlpatterns = [
     path("", include(router.urls)),
     path("cedula/<str:cedula>/", buscar_cedula),
+    path("membresias/estado/", estado_membresia_view),
     path("dias/<str:fecha>/", estado_dia),
     path("dias/<str:fecha>/observacion/", observacion_dia),
     path("reportes/dia/<str:fecha>/pdf/", pdf_resumen_dia),

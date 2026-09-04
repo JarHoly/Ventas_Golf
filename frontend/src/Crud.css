@@ -319,6 +319,33 @@ select.form-input {
   margin: 6px 0 0;
 }
 
+/* Marca en la tabla de Productos: cuáles participan del control de
+   membresías (cuál ES la membresía y cuál descuenta usos de carrito). */
+.badge-rol {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Dos campos lado a lado dentro de un modal. Vive acá (y no en
+   Movimientos.css como .fila-2) porque lo usan varios formularios. */
+.form-fila-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .form-fila-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
 .cedula-row {
   display: flex;
   gap: 8px;

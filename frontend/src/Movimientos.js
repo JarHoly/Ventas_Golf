@@ -14,6 +14,8 @@ import {
   faFlagCheckered,
   faNoteSticky,
   faBoxOpen,
+  faCircleInfo,
+  faTriangleExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
@@ -792,6 +794,69 @@ function ObservacionForm({ fecha, textoInicial, onClose, onGuardado }) {
   );
 }
 
+// ===== Aviso de usos de carrito según la membresía del cliente =====
+// Nunca bloquea el movimiento: solo informa. Puede que el negocio igual le
+// cobre el carrito extra al cliente que ya gastó sus usos.
+function AvisoCarrito({ estado, cantidad }) {
+  if (!estado) return null; // todavía no se eligió la persona
+  const dia = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
+
+  if (!estado.tiene_membresia) {
+    return (
+      <div className="aviso-carrito neutro">
+        <FontAwesomeIcon icon={faCircleInfo} />
+        <span>
+          Este cliente no tiene membresía registrada, así que no se le
+          controlan usos de carrito.
+        </span>
+      </div>
+    );
+  }
+
+  if (estado.vencida) {
+    return (
+      <div className="aviso-carrito alerta">
+        <FontAwesomeIcon icon={faTriangleExclamation} />
+        <span>
+          Su membresía <b>venció el {dia(estado.vence_el)}</b>. Ya no le quedan
+          usos de carrito hasta que renueve.
+        </span>
+      </div>
+    );
+  }
+
+  if (estado.excedido) {
+    return (
+      <div className="aviso-carrito alerta">
+        <FontAwesomeIcon icon={faTriangleExclamation} />
+        <span>
+          Ya se pasó del límite de {estado.usos_incluidos} usos{" "}
+          <b>el {dia(estado.fecha_excedido)}</b>. Lleva{" "}
+          <b>{estado.usos_consumidos}</b> usos en este período.
+        </span>
+      </div>
+    );
+  }
+
+  // Todavía le quedan: avisamos cuántos, y si ESTE movimiento lo pasaría.
+  const restantesDespues = estado.usos_restantes - (Number(cantidad) || 0);
+  return (
+    <div className={"aviso-carrito " + (restantesDespues < 0 ? "atencion" : "ok")}>
+      <FontAwesomeIcon icon={restantesDespues < 0 ? faTriangleExclamation : faCircleInfo} />
+      <span>
+        Le quedan <b>{estado.usos_restantes}</b> de {estado.usos_incluidos} usos
+        (vence el {dia(estado.vence_el)}).
+        {restantesDespues < 0 && (
+          <>
+            {" "}
+            Con este movimiento <b>se pasaría por {Math.abs(restantesDespues)}</b>.
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
 // ===== Modal de agregar/editar movimiento =====
 // En modo agregar es "pegajoso": guarda y queda abierto para el siguiente.
 function MovimientoForm({
@@ -814,6 +879,35 @@ function MovimientoForm({
   const opcionesProductoFiltradas = productos
     .filter((p) => p.uso === tipo)
     .map((p) => ({ id: p.id, label: `${p.nombre} — $${fmt(p.precio_unitario)}` }));
+
+  // ===== Aviso de usos de carrito (membresías) =====
+  // Solo aplica al vender un producto marcado como "Carrito": ahí el
+  // operativo necesita saber si al cliente le quedan usos o ya se pasó.
+  const productoElegido = productos.find((p) => String(p.id) === String(producto));
+  const esCarrito = productoElegido?.rol_especial === "Carrito" && tipo === "Venta";
+  const [membresia, setMembresia] = useState(null);
+
+  useEffect(() => {
+    if (!esCarrito || !persona) {
+      setMembresia(null);
+      return;
+    }
+    // Al editar, este movimiento ya está guardado: se excluye para que no
+    // se cuente dos veces contra la cantidad que se ve en pantalla.
+    const params = new URLSearchParams({ persona, fecha });
+    if (existente?.id) params.set("excluir", existente.id);
+    let cancelado = false;
+    apiGet(`/membresias/estado/?${params}`)
+      .then((datos) => {
+        if (!cancelado) setMembresia(datos);
+      })
+      .catch(() => {
+        if (!cancelado) setMembresia(null);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [esCarrito, persona, fecha, existente?.id]);
 
   // El modal solo ofrece las personas que corresponden al tipo de movimiento:
   // Gasto -> proveedores, Venta -> clientes y socios.
@@ -942,6 +1036,8 @@ function MovimientoForm({
             onChange={elegirProducto}
             placeholder="Escribí el producto para buscar..."
           />
+
+          {esCarrito && <AvisoCarrito estado={membresia} cantidad={cantidad} />}
 
           <label className="form-label">Moneda</label>
           <select className="form-input" value={moneda} onChange={(e) => setMoneda(e.target.value)}>

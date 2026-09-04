@@ -68,6 +68,16 @@ class Producto(models.Model):
         VENTA = "Venta", "Venta"
         GASTO = "Gasto", "Gasto"
 
+    class RolEspecial(models.TextChoices):
+        """
+        Cómo participa el producto en el control de membresías. Se configura
+        acá (y no quemado en el código) porque el negocio decide qué producto
+        es la membresía y cuál descuenta usos: puede haber varias membresías
+        con distinta vigencia, y varios productos de carrito.
+        """
+        MEMBRESIA = "Membresia", "Membresía"
+        CARRITO = "Carrito", "Carrito de golf"
+
     nombre = models.CharField(max_length=150)
     tipo = models.CharField(max_length=10, choices=Tipo.choices, default=Tipo.UNIDAD)
     # ¿Este producto se usa en Ventas o en Gastos? El modal de movimientos
@@ -77,6 +87,15 @@ class Producto(models.Model):
     categoria = models.ForeignKey(
         Categoria, on_delete=models.PROTECT, related_name="productos"
     )
+    # Vacío = producto normal (no participa del control de membresías).
+    rol_especial = models.CharField(
+        max_length=10, choices=RolEspecial.choices, blank=True, default=""
+    )
+    # Los dos campos de abajo SOLO aplican si rol_especial == "Membresia".
+    # Días que dura la membresía (365 = anual).
+    dias_vigencia = models.PositiveIntegerField(default=365)
+    # Usos de carrito incluidos en cada período de la membresía.
+    usos_carrito = models.PositiveIntegerField(default=50)
 
     class Meta:
         ordering = ["nombre"]
@@ -161,6 +180,42 @@ class Movimiento(models.Model):
     def total(self):
         # Sin impuesto por ahora; el día que se agregue IVA, se suma aquí.
         return self.subtotal
+
+
+class Membresia(models.Model):
+    """
+    Estado ACTUAL de la membresía de una persona.
+
+    NO se edita a mano y NO lleva contadores: se recalcula entera desde los
+    movimientos de productos marcados como "Membresía" (ver
+    ventas/membresias.py). Gracias a eso, si se corrige o se borra un
+    movimiento, la membresía se corrige sola — nunca queda desfasada.
+
+    Los usos de carrito consumidos TAMPOCO se guardan acá: se cuentan al
+    vuelo desde los movimientos de productos marcados como "Carrito" dentro
+    del período vigente, por la misma razón.
+    """
+    persona = models.OneToOneField(
+        Persona, on_delete=models.CASCADE, related_name="membresia"
+    )
+    # Qué membresía tiene vigente (la del último movimiento de renovación).
+    producto = models.ForeignKey(
+        Producto, on_delete=models.PROTECT, related_name="membresias"
+    )
+    # Fecha de la última compra/renovación: desde acá se cuentan los usos,
+    # porque al renovar los usos se reinician (los días sí se acumulan).
+    inicia_el = models.DateField()
+    vence_el = models.DateField()
+    # Snapshot de los usos que incluía el producto al momento de renovar: si
+    # mañana cambian el paquete a 60, las membresías ya vendidas no cambian.
+    usos_incluidos = models.PositiveIntegerField()
+    actualizada_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-vence_el"]
+
+    def __str__(self):
+        return f"{self.persona.nombre} · vence {self.vence_el}"
 
 
 class PerfilUsuario(models.Model):

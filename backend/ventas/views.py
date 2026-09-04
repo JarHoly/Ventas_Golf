@@ -10,6 +10,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework import status
 
+from .membresias import recalcular_membresia, recalcular_por_producto
 from .models import Persona, Categoria, Producto, Movimiento, CierreDia, ObservacionDia
 from .permisos import es_admin
 from .serializers import (
@@ -24,6 +25,26 @@ def _verificar_dia_abierto(fecha):
     """Lanza un error 400 si el día ya fue cerrado con TERMINAR EL DÍA."""
     if CierreDia.objects.filter(fecha=fecha).exists():
         raise ValidationError({"detail": f"El día {fecha} está cerrado. No se puede modificar."})
+
+
+def _recalcular_membresias_afectadas(movimientos, previos=()):
+    """
+    Rehace la membresía de las personas tocadas por un movimiento de
+    membresía. 'previos' son pares (persona, producto) de ANTES del cambio
+    (al editar o borrar), porque si el movimiento dejó de ser de membresía
+    —o cambió de dueño— igual hay que rehacer la del dueño anterior.
+
+    Solo se recalcula si hay un producto de membresía involucrado: los
+    movimientos de carrito no tocan esta tabla (sus usos se cuentan al
+    vuelo desde los movimientos).
+    """
+    personas = {}
+    pares = [(m.persona, m.producto) for m in movimientos] + list(previos)
+    for persona, producto in pares:
+        if producto.rol_especial == Producto.RolEspecial.MEMBRESIA:
+            personas[persona.pk] = persona
+    for persona in personas.values():
+        recalcular_membresia(persona)
 
 
 class BorradoProtegidoMixin:
@@ -72,6 +93,24 @@ class ProductoViewSet(BorradoProtegidoMixin, viewsets.ModelViewSet):
     queryset = Producto.objects.select_related("categoria").all()
     serializer_class = ProductoSerializer
 
+    def perform_update(self, serializer):
+        """
+        Al cambiar la configuración de membresía de un producto hay que
+        rehacer las membresías: marcar "Membresía ULTIMATE" como membresía
+        debe hacer que las ventas YA registradas de ese producto cuenten
+        (es la forma de que el historial viejo entre al sistema), y
+        desmarcarlo debe deshacerlas.
+        """
+        antes = (
+            serializer.instance.rol_especial,
+            serializer.instance.dias_vigencia,
+            serializer.instance.usos_carrito,
+        )
+        producto = serializer.save()
+        despues = (producto.rol_especial, producto.dias_vigencia, producto.usos_carrito)
+        if antes != despues:
+            recalcular_por_producto(producto)
+
 
 class MovimientoViewSet(viewsets.ModelViewSet):
     """
@@ -100,15 +139,22 @@ class MovimientoViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         _verificar_dia_abierto(serializer.validated_data["fecha"])
         # Guardamos quién lo registró (auditoría del login).
-        serializer.save(registrado_por=self.request.user)
+        movimiento = serializer.save(registrado_por=self.request.user)
+        _recalcular_membresias_afectadas([movimiento])
 
     def perform_update(self, serializer):
         _verificar_dia_abierto(serializer.instance.fecha)
-        serializer.save()
+        # Se guarda el "antes" porque al editar puede cambiar la persona o el
+        # producto: en ese caso hay dos membresías que rehacer, la del dueño
+        # viejo del movimiento y la del nuevo.
+        anterior = (serializer.instance.persona, serializer.instance.producto)
+        movimiento = serializer.save()
+        _recalcular_membresias_afectadas([movimiento], previos=[anterior])
 
     def perform_destroy(self, instance):
         _verificar_dia_abierto(instance.fecha)
         fecha = instance.fecha
+        borrado = (instance.persona, instance.producto)
         # transaction.atomic = "todo o nada": si algo falla a mitad de la
         # renumeración, la base vuelve al estado anterior (sin números salteados).
         with transaction.atomic():
@@ -118,6 +164,7 @@ class MovimientoViewSet(viewsets.ModelViewSet):
             for i, mov in enumerate(restantes, start=1):
                 if mov.numero != i:
                     Movimiento.objects.filter(pk=mov.pk).update(numero=i)
+            _recalcular_membresias_afectadas([], previos=[borrado])
 
 
 @api_view(["GET", "POST", "DELETE"])

@@ -148,7 +148,19 @@ export default function Productos({ filtroInicial = "" }) {
             <tbody>
               {visibles.map((p) => (
                 <tr key={p.id}>
-                  <td>{p.nombre}</td>
+                  <td>
+                    {p.nombre}
+                    {p.rol_especial === "Membresia" && (
+                      <span className="badge-rol" title={`Membresía de ${p.dias_vigencia} días · ${p.usos_carrito} usos de carrito`}>
+                        Membresía
+                      </span>
+                    )}
+                    {p.rol_especial === "Carrito" && (
+                      <span className="badge-rol" title="Descuenta usos de la membresía del cliente">
+                        Carrito
+                      </span>
+                    )}
+                  </td>
                   <td>{p.tipo}</td>
                   <td>
                     <span className={p.uso === "Gasto" ? "badge-gasto" : "badge-venta"}>
@@ -207,6 +219,9 @@ function ProductoForm({ existente, onClose, onGuardado }) {
   const [uso, setUso] = useState(existente?.uso || "Venta");
   const [precio, setPrecio] = useState(existente?.precio_unitario || "");
   const [categoria, setCategoria] = useState(existente?.categoria || "");
+  const [rolEspecial, setRolEspecial] = useState(existente?.rol_especial || "");
+  const [diasVigencia, setDiasVigencia] = useState(existente?.dias_vigencia ?? 365);
+  const [usosCarrito, setUsosCarrito] = useState(existente?.usos_carrito ?? 50);
   const [categorias, setCategorias] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -229,6 +244,9 @@ function ProductoForm({ existente, onClose, onGuardado }) {
       uso,
       precio_unitario: precio,
       categoria, // se manda el id de la categoría
+      rol_especial: rolEspecial,
+      dias_vigencia: Number(diasVigencia) || 365,
+      usos_carrito: Number(usosCarrito) || 0,
     };
     try {
       if (editando) {
@@ -321,6 +339,68 @@ function ProductoForm({ existente, onClose, onGuardado }) {
               </option>
             ))}
           </select>
+
+          {/* Control de membresías: acá se define QUÉ producto es la
+              membresía y CUÁL descuenta usos de carrito, en vez de dejarlo
+              quemado en el código. */}
+          <label className="form-label">Control de membresías</label>
+          <select
+            className="form-input"
+            value={rolEspecial}
+            onChange={(e) => setRolEspecial(e.target.value)}
+          >
+            <option value="">Producto normal (no participa)</option>
+            <option value="Membresia">Es una membresía (al venderla se activa/renueva)</option>
+            <option value="Carrito">Es un carrito de golf (descuenta usos)</option>
+          </select>
+
+          {rolEspecial === "Membresia" && (
+            <>
+              <div className="form-fila-2">
+                <div>
+                  <label className="form-label">Días de vigencia</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="1"
+                    value={diasVigencia}
+                    onChange={(e) => setDiasVigencia(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Usos de carrito incluidos</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="0"
+                    value={usosCarrito}
+                    onChange={(e) => setUsosCarrito(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <p className="form-hint">
+                Al renovar, los días que le sobraban al cliente se suman a la
+                nueva vigencia (no se pierden), pero los usos de carrito
+                vuelven a empezar desde {usosCarrito || 0}.
+              </p>
+            </>
+          )}
+
+          {rolEspecial === "Carrito" && (
+            <p className="form-hint">
+              Cada venta de este producto descuenta usos de la membresía del
+              cliente, según la cantidad del movimiento.
+            </p>
+          )}
+
+          {editando && rolEspecial !== (existente?.rol_especial || "") && (
+            <p className="form-hint">
+              Al guardar, se revisan los movimientos YA registrados de este
+              producto para armar (o deshacer) las membresías del historial.
+            </p>
+          )}
 
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>
