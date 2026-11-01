@@ -27,7 +27,14 @@ import ModalOverlay from "./ModalOverlay";
 import "./Crud.css";
 import "./Movimientos.css";
 
-const METODOS = ["Efectivo", "Tarjeta", "Sinpe", "Transferencia"];
+const METODOS = ["Efectivo", "Tarjeta", "Sinpe", "Transferencia", "Regalia"];
+// "Regalia" es el valor que viaja al backend; "Regalía" es como se lee.
+const ETIQUETA_METODO = { Regalia: "Regalía" };
+const etiquetaMetodo = (m) => ETIQUETA_METODO[m] || m;
+// Lo regalado se registra en CERO: no entró plata, así que no puede sumar a
+// las ventas del día. El precio se bloquea en la pantalla y el backend lo
+// fuerza igual (ver MovimientoSerializer.validate).
+const ES_REGALIA = (m) => m === "Regalia";
 const SIMBOLOS = { USD: "$", CRC: "₡" };
 
 // Formatea 1500 -> "1,500.00"
@@ -245,7 +252,7 @@ export default function Movimientos() {
       Tipo: m.persona_tipo,
       Movimiento: m.tipo,
       Producto: m.producto_nombre,
-      Método: m.metodo,
+      Método: etiquetaMetodo(m.metodo),
       Moneda: m.moneda,
       Cantidad: m.cantidad,
       "Precio Unit": Number(m.precio_unitario),
@@ -290,7 +297,7 @@ export default function Movimientos() {
   // efectivo, cuánto en tarjeta, etc. Solo Ventas en USD — los gastos son de
   // proveedores y no tiene sentido mezclarlos acá, mismo criterio que la
   // dona de distribución por método.
-  const METODOS_RESUMEN = ["Tarjeta", "Efectivo", "Transferencia", "Sinpe"];
+  const METODOS_RESUMEN = ["Tarjeta", "Efectivo", "Transferencia", "Sinpe", "Regalia"];
   const resumenProductos = (() => {
     const porProducto = {};
     visibles
@@ -469,7 +476,7 @@ export default function Movimientos() {
             >
               <option value="">Todos</option>
               {METODOS.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m} value={m}>{etiquetaMetodo(m)}</option>
               ))}
             </select>
           </div>
@@ -561,7 +568,13 @@ export default function Movimientos() {
                       <span className={g ? "badge-gasto" : "badge-venta"}>{m.tipo}</span>
                     </td>
                     <td>{m.producto_nombre}</td>
-                    <td>{m.metodo}</td>
+                    <td>
+                      {ES_REGALIA(m.metodo) ? (
+                        <span className="badge-regalia">Regalía</span>
+                      ) : (
+                        m.metodo
+                      )}
+                    </td>
                     <td>
                       <span className="badge-moneda">{m.moneda}</span>
                     </td>
@@ -630,7 +643,7 @@ export default function Movimientos() {
                 <th>Producto</th>
                 <th className="num">Cantidad</th>
                 {METODOS_RESUMEN.map((met) => (
-                  <th className="num" key={met}>{met}</th>
+                  <th className="num" key={met}>{etiquetaMetodo(met)}</th>
                 ))}
               </tr>
             </thead>
@@ -859,13 +872,11 @@ function AvisoCarrito({ estado, cantidad }) {
 }
 
 // ¿Este producto se puede usar en un movimiento de este tipo?
-// Un producto de venta que lleva inventario también sirve para un GASTO:
-// así se registra la compra de mercadería (y así suma a las existencias).
+// Lo decide el campo 'uso' de su ficha, y nada más: los de "Ambos" (la
+// mercadería que se compra al proveedor y se le vende al cliente) salen
+// en los dos modales.
 function productoAplica(producto, tipo) {
-  if (tipo === "Gasto") {
-    return producto.uso === "Gasto" || producto.controla_inventario;
-  }
-  return producto.uso === "Venta";
+  return producto.uso === "Ambos" || producto.uso === tipo;
 }
 
 // ===== Aviso de la membresía del cliente al registrar un movimiento =====
@@ -918,18 +929,19 @@ function MovimientoForm({
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
-  // Qué productos ofrece el modal según el tipo de movimiento:
-  //  - Venta  -> los productos de venta.
-  //  - Gasto  -> los productos de gasto Y TAMBIÉN los que llevan inventario,
-  //    porque comprarle mercadería al proveedor es un gasto del mismo
-  //    producto que después se vende (es así como entra al inventario).
+  // No se cobró nada: el precio y el descuento quedan en cero y bloqueados.
+  const esRegalia = ES_REGALIA(metodo);
+
+  // Qué productos ofrece el modal: los que en su ficha dicen que sirven
+  // para este tipo de movimiento. La mercadería que se compra y se vende
+  // (uso "Venta y Gasto") aparece en los dos.
   const opcionesProductoFiltradas = productos
     .filter((p) => productoAplica(p, tipo))
     .map((p) => ({
       id: p.id,
       label:
         `${p.nombre} - $${fmt(p.precio_unitario)}` +
-        (tipo === "Gasto" && p.controla_inventario ? " · inventario" : ""),
+        (p.controla_inventario ? " · inventario" : ""),
     }));
 
   // ===== Membresía del cliente =====
@@ -991,11 +1003,27 @@ function MovimientoForm({
     if (p) cambiarTipo(p.tipo === "Proveedor" ? "Gasto" : "Venta");
   }
 
-  // Al elegir producto: se copia su precio (snapshot editable).
+  // Al elegir producto: se copia su precio (snapshot editable). Si es una
+  // regalía el precio es cero, porque no se cobró nada.
   function elegirProducto(id) {
     setProducto(id);
     const p = productos.find((x) => String(x.id) === String(id));
-    if (p) setPrecio(p.precio_unitario);
+    if (p) setPrecio(esRegalia ? 0 : p.precio_unitario);
+  }
+
+  // Cambiar a Regalía pone la línea en cero; salir de Regalía recupera el
+  // precio del producto, para no dejar una venta en cero por descuido.
+  function cambiarMetodo(nuevo) {
+    setMetodo(nuevo);
+    if (ES_REGALIA(nuevo)) {
+      setPrecio(0);
+      setDescuento(0);
+      return;
+    }
+    if (ES_REGALIA(metodo)) {
+      const p = productos.find((x) => String(x.id) === String(producto));
+      setPrecio(p ? p.precio_unitario : "");
+    }
   }
 
   // SubTotal y Total en vivo mientras se escribe.
@@ -1007,7 +1035,7 @@ function MovimientoForm({
       setError("Seleccioná la persona y el producto.");
       return;
     }
-    if (subtotal < 0) {
+    if (!esRegalia && subtotal < 0) {
       setError("El descuento no puede ser mayor que cantidad × precio.");
       return;
     }
@@ -1017,8 +1045,8 @@ function MovimientoForm({
       fecha, tipo, metodo,
       persona, producto,
       cantidad: Number(cantidad),
-      precio_unitario: precio,
-      descuento: descuento === "" ? "0" : String(descuento),
+      precio_unitario: esRegalia ? "0" : precio,
+      descuento: esRegalia ? "0" : descuento === "" ? "0" : String(descuento),
       moneda,
     };
     try {
@@ -1075,9 +1103,9 @@ function MovimientoForm({
             </div>
             <div>
               <label className="form-label">Método de pago</label>
-              <select className="form-input" value={metodo} onChange={(e) => setMetodo(e.target.value)}>
+              <select className="form-input" value={metodo} onChange={(e) => cambiarMetodo(e.target.value)}>
                 {METODOS.map((m) => (
-                  <option key={m}>{m}</option>
+                  <option key={m} value={m}>{etiquetaMetodo(m)}</option>
                 ))}
               </select>
             </div>
@@ -1129,8 +1157,9 @@ function MovimientoForm({
               <label className="form-label">Precio unit ({SIMBOLOS[moneda]})</label>
               <input
                 type="number" step="0.01" min="0" className="form-input"
-                value={precio}
+                value={esRegalia ? 0 : precio}
                 onChange={(e) => setPrecio(e.target.value)}
+                disabled={esRegalia}
                 required
               />
             </div>
@@ -1138,11 +1167,25 @@ function MovimientoForm({
               <label className="form-label">Descuento ({SIMBOLOS[moneda]})</label>
               <input
                 type="number" step="0.01" min="0" className="form-input"
-                value={descuento}
+                value={esRegalia ? 0 : descuento}
                 onChange={(e) => setDescuento(e.target.value)}
+                disabled={esRegalia}
               />
             </div>
           </div>
+
+          {esRegalia && (
+            <div className="aviso-carrito neutro">
+              <FontAwesomeIcon icon={faCircleInfo} />
+              <span>
+                Se registra en <b>cero</b>: no suma a las ventas del día. Queda
+                el registro de qué se regaló y cuánto
+                {productoElegido?.controla_inventario
+                  ? ", y las unidades salen del inventario."
+                  : "."}
+              </span>
+            </div>
+          )}
 
           {/* Totales calculados en vivo (en la moneda elegida) */}
           <div className={"totales-vivo" + (tipo === "Gasto" ? " es-gasto" : "")}>

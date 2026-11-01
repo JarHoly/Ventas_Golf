@@ -17,7 +17,10 @@ from rest_framework import status
 from .models import Movimiento
 from .permisos import es_personal
 
-METODOS = ["Transferencia", "Efectivo", "Tarjeta", "Sinpe"]
+# "Regalia" va al final: no es un medio de cobro, y sus montos son cero.
+# Igual entra en la tabla por método para poder ver cuántas unidades se
+# regalaron en el período.
+METODOS = ["Transferencia", "Efectivo", "Tarjeta", "Sinpe", "Regalia"]
 
 # El "monto" de un movimiento (cantidad × precio − descuento) calculado por la
 # base de datos. Es la misma fórmula del @property subtotal del modelo, pero

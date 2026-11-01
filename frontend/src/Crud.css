@@ -391,6 +391,33 @@ select.form-input {
   }
 }
 
+/* Regalía: no es un medio de cobro, es lo que se entrega sin cobrar. Va en
+   gris a propósito — no mueve plata, y así no compite visualmente con los
+   métodos que sí la mueven. */
+.badge-regalia {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Uso "Venta y Gasto": mercadería que se compra al proveedor y se le vende
+   al cliente. Color propio, porque no es ni lo uno ni lo otro. */
+.badge-ambos {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #e1f0ff;
+  color: #00457a;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 /* Marca en la tabla de Productos: cuáles llevan existencias. Se distingue
    de .badge-rol (membresías) por el color: son dos controles distintos. */
 .badge-inv {

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.utils import timezone
 from rest_framework import serializers
 from .models import AjusteInventario, Categoria, Persona, Producto, Movimiento
@@ -82,6 +84,16 @@ class MovimientoSerializer(serializers.ModelSerializer):
     def validate(self, datos):
         """El descuento no puede superar el monto de la línea (cantidad × precio):
         un total negativo no tiene sentido y produce reportes confusos."""
+        metodo = datos.get("metodo", getattr(self.instance, "metodo", None))
+
+        # REGALÍA siempre va en CERO. Se fuerza acá, en el backend, y no solo
+        # en la pantalla: es la regla que hace que lo regalado no sume un peso
+        # a los ingresos, y tiene que valer venga de donde venga el dato.
+        if metodo == Movimiento.Metodo.REGALIA:
+            datos["precio_unitario"] = Decimal("0")
+            datos["descuento"] = Decimal("0")
+            return datos
+
         cantidad = datos.get("cantidad", getattr(self.instance, "cantidad", 1))
         precio = datos.get("precio_unitario", getattr(self.instance, "precio_unitario", 0))
         descuento = datos.get("descuento", getattr(self.instance, "descuento", 0))

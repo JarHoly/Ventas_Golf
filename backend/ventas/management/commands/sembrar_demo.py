@@ -37,12 +37,14 @@ PRIMER_DIA = date(2026, 10, 1)
 CATEGORIAS = ["Pelotas", "Tienda", "Cafetería", "Clases", "Alquiler carritos", "Membresías"]
 
 # (nombre, tipo, uso, precio, categoría, controla_inventario, rol_especial)
+# La mercadería va con uso "Ambos": se le compra al proveedor y se le vende
+# al cliente, que es justo para lo que existe ese uso.
 PRODUCTOS = [
-    ("Caja de bolas Pro V1", "Unidad", "Venta", "55.00", "Pelotas", True, ""),
-    ("Guantes de golf", "Unidad", "Venta", "28.00", "Tienda", True, ""),
-    ("Gorra E-Cuestas", "Unidad", "Venta", "22.00", "Tienda", True, ""),
-    ("Bebida hidratante", "Unidad", "Venta", "3.50", "Cafetería", True, ""),
-    ("Tees de madera (bolsa)", "Unidad", "Venta", "6.00", "Tienda", True, ""),
+    ("Caja de bolas Pro V1", "Unidad", "Ambos", "55.00", "Pelotas", True, ""),
+    ("Guantes de golf", "Unidad", "Ambos", "28.00", "Tienda", True, ""),
+    ("Gorra E-Cuestas", "Unidad", "Ambos", "22.00", "Tienda", True, ""),
+    ("Bebida hidratante", "Unidad", "Ambos", "3.50", "Cafetería", True, ""),
+    ("Tees de madera (bolsa)", "Unidad", "Ambos", "6.00", "Tienda", True, ""),
     ("Clase particular", "Servicio", "Venta", "45.00", "Clases", False, ""),
     ("Membresía Anual Socio", "Servicio", "Venta", "850.00", "Membresías", False, "Membresia"),
     ("Alquiler de carrito 18 hoyos", "Alquiler", "Venta", "35.00", "Alquiler carritos", False, "Carrito"),

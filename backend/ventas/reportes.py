@@ -58,8 +58,14 @@ GRIS = colors.HexColor("#64748B")
 BORDE = colors.HexColor("#D8E0EC")
 ZEBRA = colors.HexColor("#F5F8FC")
 
-COLOR_METODO = {"Transferencia": AZUL, "Efectivo": VERDE, "Tarjeta": ROJO, "Sinpe": MORADO}
-METODOS = ["Transferencia", "Efectivo", "Tarjeta", "Sinpe"]
+COLOR_METODO = {
+    "Transferencia": AZUL, "Efectivo": VERDE, "Tarjeta": ROJO,
+    "Sinpe": MORADO, "Regalia": GRIS,  # gris: no mueve plata
+}
+METODOS = ["Transferencia", "Efectivo", "Tarjeta", "Sinpe", "Regalia"]
+
+# "Regalia" es el valor que se guarda; "Regalía" es como se lee.
+ETIQUETA_METODO = {"Regalia": "Regalía"}
 
 # Las categorías las crea el usuario en el CRUD (no son un set fijo como los
 # métodos de pago), así que se les asigna color de esta paleta por orden,
@@ -1617,27 +1623,12 @@ def pdf_existencias(request):
     ]))
     elementos.append(tabla)
 
-    # ============ CÓMO LEER EL REPORTE ============
-    # Va impreso a propósito: el PDF se imprime y se comenta en reunión, sin
-    # nadie al lado para explicar qué significa "rotación 2.4x".
+    # Al pie va SOLO el período. El encabezado ya dice de qué va el reporte y
+    # las tarjetas dan los totales: repetirlos abajo, o explicar cada columna,
+    # solo agregaba ruido a una hoja que ya está llena de números.
     elementos.append(Spacer(1, 3 * mm))
     elementos.append(_p(
-        "<b>Existencia hoy</b> = había antes + entró - se vendió + ajustes. "
-        "Lo que <b>entró</b> son las compras al proveedor (movimientos de Gasto) y "
-        "los <b>ajustes</b> es lo que entró o salió sin pasar por caja (inventario "
-        "inicial, mermas, conteos). "
-        "<b>Venta por día</b> = unidades vendidas entre los días del período. "
-        "<b>Rotación</b> = cuántas veces se vendió el inventario completo en el "
-        "período (arriba de 1x se mueve; abajo de 0.5x es plata detenida). "
-        "<b>Alcanza para</b> = a ese ritmo, cuántos días dura lo que queda, que es "
-        "también cada cuánto hay que reponer. "
-        f"<b>Comprar</b> = unidades a pedir para cubrir {reporte['dias_objetivo']} días.",
-        7.5, GRIS, italica=True, leading=10,
-    ))
-    elementos.append(Spacer(1, 1.5 * mm))
-    elementos.append(_p(
-        f"Período del {dia_desde} al {dia_hasta} ({reporte['dias']} días) · "
-        f"{tot['productos']} productos con control de inventario",
+        f"Período del {dia_desde} al {dia_hasta} ({reporte['dias']} días)",
         7.5, GRIS, italica=True, alin=1,
     ))
 

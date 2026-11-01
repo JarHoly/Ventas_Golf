@@ -3,7 +3,9 @@ from datetime import date, datetime
 from django.test import TestCase
 from django.utils import timezone
 
+from .informes import calcular_informe
 from .inventario import calcular_existencias, existencia_actual, leer_dias_objetivo
+from .serializers import MovimientoSerializer
 from .membresias import estado_membresia, recalcular_membresia, recalcular_por_producto
 from .models import (
     AjusteInventario,
@@ -500,3 +502,91 @@ class InventarioTests(TestCase):
         # Y los agregados siguen cuadrando con el desglose.
         self.assertEqual(totales["entradas"], 34)
         self.assertEqual(totales["salidas"], 8)
+
+    def test_producto_de_venta_y_gasto(self):
+        """
+        El caso del negocio: las bolas se le COMPRAN al proveedor y se le
+        VENDEN al cliente. Con uso "Ambos" el mismo producto sirve para los
+        dos movimientos, y el inventario sube con la compra y baja con la
+        venta.
+        """
+        self.bolas.uso = Producto.Uso.AMBOS
+        self.bolas.save()
+        self._mover(self.bolas, date(2026, 3, 1), 60, Movimiento.Tipo.GASTO)
+        self._mover(self.bolas, date(2026, 3, 9), 14)
+        fila = self._fila(date(2026, 3, 1), date(2026, 3, 31))
+        self.assertEqual(fila["compras"], 60)
+        self.assertEqual(fila["ventas"], 14)
+        self.assertEqual(fila["existencia"], 46)
+
+    def test_el_uso_ambos_existe_como_opcion(self):
+        """Antes había que elegir entre Venta y Gasto, y la mercadería que se
+        compra y se vende no entraba en ninguna de las dos."""
+        self.assertIn("Ambos", Producto.Uso.values)
+        self.assertEqual(Producto.Uso.AMBOS.label, "Venta y Gasto")
+
+
+class RegaliaTests(TestCase):
+    """
+    REGALÍA: lo que se entrega sin cobrar. Ocupa el lugar del método de pago
+    (si no se pagó en efectivo ni por transferencia, se regaló) pero se
+    registra en CERO, así que no suma un peso a los ingresos.
+    """
+
+    def setUp(self):
+        self.categoria = Categoria.objects.create(nombre="Tienda")
+        self.cliente = Persona.objects.create(cedula="4-4444-4444", nombre="Cliente Regalo")
+        self.bolas = Producto.objects.create(
+            nombre="Caja de bolas", precio_unitario=55,
+            categoria=self.categoria, controla_inventario=True,
+        )
+
+    def _guardar(self, metodo, precio="55.00", descuento="0"):
+        serializer = MovimientoSerializer(data={
+            "fecha": "2026-03-10", "tipo": "Venta", "metodo": metodo,
+            "persona": self.cliente.id, "producto": self.bolas.id,
+            "cantidad": 2, "precio_unitario": precio,
+            "descuento": descuento, "moneda": "USD",
+        })
+        serializer.is_valid(raise_exception=True)
+        return serializer.save()
+
+    def test_la_regalia_se_guarda_en_cero(self):
+        """Aunque el precio llegue con monto, el backend lo pone en cero: es
+        la regla que hace que lo regalado no infle las ventas."""
+        mov = self._guardar("Regalia", precio="55.00")
+        self.assertEqual(mov.precio_unitario, 0)
+        self.assertEqual(mov.total, 0)
+
+    def test_la_regalia_no_suma_a_las_ventas(self):
+        self._guardar("Efectivo", precio="55.00")
+        self._guardar("Regalia", precio="55.00")
+        informe = calcular_informe(date(2026, 3, 1), date(2026, 3, 31))
+        # Solo la venta de verdad: 2 x 55.
+        self.assertEqual(informe["totales"]["ventas"], 110.0)
+        self.assertEqual(informe["totales"]["movimientos"], 2)
+
+    def test_la_regalia_sale_del_inventario(self):
+        """La caja salió de la bodega igual que si se hubiera vendido."""
+        AjusteInventario.objects.create(
+            producto=self.bolas, fecha=date(2026, 3, 1),
+            tipo=AjusteInventario.Tipo.INICIAL, cantidad=10, motivo="inicial",
+        )
+        self._guardar("Regalia")
+        self.assertEqual(existencia_actual()[self.bolas.id], 8)
+
+    def test_la_regalia_aparece_en_la_tabla_por_metodo(self):
+        """Con monto cero, pero con las unidades: es el único rastro de
+        cuánto se regaló en el período."""
+        self._guardar("Regalia")
+        informe = calcular_informe(date(2026, 3, 1), date(2026, 3, 31))
+        fila = next(f for f in informe["por_metodo"] if f["metodo"] == "Regalia")
+        self.assertEqual(fila["ventas"], 0.0)
+        self.assertEqual(fila["cantidad"], 2)
+        self.assertEqual(fila["movimientos"], 1)
+
+    def test_el_descuento_sigue_validandose_en_las_ventas_normales(self):
+        """El atajo de la regalía no puede saltearse la validación de las
+        demás: un descuento mayor que la línea sigue siendo un error."""
+        with self.assertRaises(Exception):
+            self._guardar("Efectivo", precio="10.00", descuento="999.00")

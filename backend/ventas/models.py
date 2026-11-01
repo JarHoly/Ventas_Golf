@@ -65,8 +65,15 @@ class Producto(models.Model):
         UNIDAD = "Unidad", "Unidad"
 
     class Uso(models.TextChoices):
+        """
+        En qué movimiento se puede usar el producto. AMBOS existe porque hay
+        mercadería que se COMPRA y se VENDE: las bolas se le compran al
+        proveedor (gasto) y se le venden al cliente (venta), y antes había
+        que elegir una sola cosa.
+        """
         VENTA = "Venta", "Venta"
         GASTO = "Gasto", "Gasto"
+        AMBOS = "Ambos", "Venta y Gasto"
 
     class RolEspecial(models.TextChoices):
         """
@@ -80,8 +87,9 @@ class Producto(models.Model):
 
     nombre = models.CharField(max_length=150)
     tipo = models.CharField(max_length=10, choices=Tipo.choices, default=Tipo.UNIDAD)
-    # ¿Este producto se usa en Ventas o en Gastos? El modal de movimientos
-    # solo ofrece los productos que correspondan al tipo de movimiento.
+    # ¿Este producto se usa en Ventas, en Gastos o en los dos? El modal de
+    # movimientos solo ofrece los productos que correspondan al tipo de
+    # movimiento; los de uso "Ambos" aparecen en los dos.
     uso = models.CharField(max_length=10, choices=Uso.choices, default=Uso.VENTA)
     precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
     categoria = models.ForeignKey(
@@ -121,6 +129,12 @@ class Movimiento(models.Model):
         EFECTIVO = "Efectivo", "Efectivo"
         SINPE = "Sinpe", "Sinpe"
         TARJETA = "Tarjeta", "Tarjeta"
+        # REGALÍA no es una forma de cobrar: es lo que se entrega sin cobrar.
+        # Va acá porque ocupa el mismo lugar en la pantalla (si no se pagó en
+        # efectivo ni por transferencia, se regaló), pero se registra en CERO,
+        # así que no suma un peso a los ingresos. Lo que queda es el rastro de
+        # QUÉ se regaló y cuánto, y la baja del inventario.
+        REGALIA = "Regalia", "Regalía"
 
     class Moneda(models.TextChoices):
         USD = "USD", "USD"

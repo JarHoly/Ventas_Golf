@@ -19,6 +19,13 @@ import "./Crud.css";
 
 const POR_PAGINA = 10;
 const TIPOS = ["Alquiler", "Servicio", "Unidad"];
+// Color del badge de "uso" en la tabla. "Ambos" lleva el suyo: no es ni una
+// venta ni un gasto, es mercadería que pasa por los dos lados.
+const CLASE_USO = {
+  Venta: "badge-venta",
+  Gasto: "badge-gasto",
+  Ambos: "badge-ambos",
+};
 
 export default function Productos({ filtroInicial = "" }) {
   const [items, setItems] = useState([]);
@@ -74,7 +81,7 @@ export default function Productos({ filtroInicial = "" }) {
     const filas = items.map((p) => ({
       Nombre: p.nombre,
       Tipo: p.tipo,
-      Uso: p.uso,
+      Uso: p.uso === "Ambos" ? "Venta y Gasto" : p.uso,
       "Precio Unitario": Number(p.precio_unitario),
       Categoría: p.categoria_nombre,
       "Controla inventario": p.controla_inventario ? "Sí" : "No",
@@ -169,8 +176,8 @@ export default function Productos({ filtroInicial = "" }) {
                   </td>
                   <td>{p.tipo}</td>
                   <td>
-                    <span className={p.uso === "Gasto" ? "badge-gasto" : "badge-venta"}>
-                      {p.uso}
+                    <span className={CLASE_USO[p.uso] || "badge-venta"}>
+                      {p.uso === "Ambos" ? "Venta y Gasto" : p.uso}
                     </span>
                   </td>
                   <td>${Number(p.precio_unitario).toFixed(2)}</td>
@@ -329,14 +336,17 @@ function ProductoForm({ existente, onClose, onGuardado }) {
               </select>
             </div>
             <div>
-              <label className="form-label">Uso (¿Venta o Gasto?)</label>
+              <label className="form-label">Uso (¿en qué movimiento?)</label>
               <select
                 className="form-input"
                 value={uso}
                 onChange={(e) => setUso(e.target.value)}
               >
-                <option>Venta</option>
-                <option>Gasto</option>
+                <option value="Venta">Venta</option>
+                <option value="Gasto">Gasto</option>
+                {/* Mercadería que se le compra al proveedor y se le vende al
+                    cliente: las bolas, los guantes, las bebidas. */}
+                <option value="Ambos">Venta y Gasto</option>
               </select>
             </div>
           </div>
