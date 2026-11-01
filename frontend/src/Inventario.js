@@ -495,45 +495,9 @@ function Existencias() {
                 onCambio={setPagina}
               />
 
-              {/* Cómo leer el reporte: las mismas definiciones que salen
-                  impresas en el PDF, para que nadie tenga que adivinar. */}
-              <div className="inv-leyenda">
-                <h3>
-                  <FontAwesomeIcon icon={faCircleInfo} /> Cómo leer este reporte
-                </h3>
-                <ul>
-                  <li>
-                    <b>Existencia hoy</b> es la cuenta de las cuatro columnas
-                    grises que le siguen: <b>había antes</b> + <b>entró</b> -{" "}
-                    <b>se vendió</b> + <b>ajustes</b>. Lo que "entró" son las
-                    compras al proveedor, o sea los movimientos de{" "}
-                    <b>Gasto</b> de ese producto.
-                  </li>
-                  <li>
-                    <b>Venta/día</b> es el ritmo: unidades vendidas entre los
-                    días del período. De ahí salen las dos últimas columnas.
-                  </li>
-                  <li>
-                    <b>Rotación</b>: cuántas veces se vendió el inventario
-                    completo en el período. Arriba de 1x el producto se mueve;
-                    abajo de 0.5x es plata detenida en bodega.
-                  </li>
-                  <li>
-                    <b>Alcanza para</b>: a ese ritmo, cuántos días dura lo que
-                    queda. Es también cada cuánto hay que reponer.
-                  </li>
-                  <li>
-                    <b>Comprar</b>: unidades a pedir para no quedarse corto en
-                    los próximos {datos.dias_objetivo} días (lo cambiás con el
-                    selector "Cubrir" de arriba). Las filas en rojo son las que
-                    alcanzan para menos de una semana.
-                  </li>
-                </ul>
-                <span className="inv-leyenda-pie">
-                  Período {fechaCorta(datos.desde)} - {fechaCorta(datos.hasta)} ·{" "}
-                  {datos.dias} días
-                </span>
-              </div>
+              {/* La explicación de cada columna vive en el tooltip de su
+                  propio encabezado: está donde se necesita, sin ocupar
+                  media pantalla debajo de la tabla. */}
             </>
           )}
         </>
