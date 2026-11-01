@@ -77,6 +77,7 @@ export default function Productos({ filtroInicial = "" }) {
       Uso: p.uso,
       "Precio Unitario": Number(p.precio_unitario),
       Categoría: p.categoria_nombre,
+      "Controla inventario": p.controla_inventario ? "Sí" : "No",
     }));
     const hoja = XLSX.utils.json_to_sheet(filas);
     const libro = XLSX.utils.book_new();
@@ -160,6 +161,11 @@ export default function Productos({ filtroInicial = "" }) {
                         Carrito
                       </span>
                     )}
+                    {p.controla_inventario && (
+                      <span className="badge-inv" title="Lleva existencias: suma al comprar y resta al vender">
+                        Inventario
+                      </span>
+                    )}
                   </td>
                   <td>{p.tipo}</td>
                   <td>
@@ -222,10 +228,22 @@ function ProductoForm({ existente, onClose, onGuardado }) {
   const [rolEspecial, setRolEspecial] = useState(existente?.rol_especial || "");
   const [diasVigencia, setDiasVigencia] = useState(existente?.dias_vigencia ?? 365);
   const [usosCarrito, setUsosCarrito] = useState(existente?.usos_carrito ?? 50);
+  const [controlaInventario, setControlaInventario] = useState(
+    existente?.controla_inventario ?? false
+  );
   const [categorias, setCategorias] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const editando = Boolean(existente);
+  // Un Servicio no tiene nada físico que contar (una clase no se guarda en
+  // bodega): se le esconde la casilla de inventario para que no se marque
+  // por error y ensucie el reporte de existencias.
+  const esServicio = tipo === "Servicio";
+
+  function cambiarTipo(nuevo) {
+    setTipo(nuevo);
+    if (nuevo === "Servicio") setControlaInventario(false);
+  }
 
   // El <select> de categorías necesita la lista: la pedimos al abrir el modal.
   useEffect(() => {
@@ -244,6 +262,9 @@ function ProductoForm({ existente, onClose, onGuardado }) {
       uso,
       precio_unitario: precio,
       categoria, // se manda el id de la categoría
+      // Se fuerza en falso para los servicios: aunque la casilla esté
+      // escondida, el estado pudo quedar marcado de antes de cambiar el tipo.
+      controla_inventario: esServicio ? false : controlaInventario,
       rol_especial: rolEspecial,
       dias_vigencia: Number(diasVigencia) || 365,
       usos_carrito: Number(usosCarrito) || 0,
@@ -264,7 +285,7 @@ function ProductoForm({ existente, onClose, onGuardado }) {
 
   return (
     <ModalOverlay onClose={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-2col" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal-title">
           {editando ? "Editar producto" : "Nuevo producto"}
         </h2>
@@ -288,57 +309,91 @@ function ProductoForm({ existente, onClose, onGuardado }) {
             autoFocus
           />
 
-          <label className="form-label">Tipo</label>
-          <select
-            className="form-input"
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value)}
-          >
-            {TIPOS.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+          {/* De acá para abajo, los campos cortos van de a dos por fila:
+              el formulario entra de una sola mirada en vez de obligar a
+              hacer scroll dentro del modal. En teléfono vuelven a una
+              columna (ver .form-fila-2 en Crud.css). */}
+          <div className="form-fila-2">
+            <div>
+              <label className="form-label">Tipo</label>
+              <select
+                className="form-input"
+                value={tipo}
+                onChange={(e) => cambiarTipo(e.target.value)}
+              >
+                {TIPOS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Uso (¿Venta o Gasto?)</label>
+              <select
+                className="form-input"
+                value={uso}
+                onChange={(e) => setUso(e.target.value)}
+              >
+                <option>Venta</option>
+                <option>Gasto</option>
+              </select>
+            </div>
+          </div>
 
-          <label className="form-label">Uso (¿en qué movimiento aparece?)</label>
-          <select
-            className="form-input"
-            value={uso}
-            onChange={(e) => setUso(e.target.value)}
-          >
-            <option>Venta</option>
-            <option>Gasto</option>
-          </select>
+          <div className="form-fila-2">
+            <div>
+              <label className="form-label">Precio unitario ($)</label>
+              <input
+                className="form-input"
+                type="number"
+                step="0.01"
+                min="0"
+                value={precio}
+                onChange={(e) => setPrecio(e.target.value)}
+                placeholder="0.00"
+                required
+              />
+            </div>
+            <div>
+              <label className="form-label">Categoría</label>
+              <select
+                className="form-input"
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                required
+              >
+                <option value="" disabled>
+                  Seleccioná una categoría...
+                </option>
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-          <label className="form-label">Precio unitario ($)</label>
-          <input
-            className="form-input"
-            type="number"
-            step="0.01"
-            min="0"
-            value={precio}
-            onChange={(e) => setPrecio(e.target.value)}
-            placeholder="0.00"
-            required
-          />
-
-          <label className="form-label">Categoría</label>
-          <select
-            className="form-input"
-            value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
-            required
-          >
-            <option value="" disabled>
-              Seleccioná una categoría...
-            </option>
-            {categorias.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
+          {/* Control de inventario: al comprarlo (gasto) suma existencias,
+              al venderlo resta, y entra al reporte de rotación. Los
+              servicios y las clases van apagados. */}
+          {esServicio ? (
+            <p className="form-hint form-hint-solo">
+              Los servicios no llevan existencias.
+            </p>
+          ) : (
+            <label className="form-check">
+              <input
+                type="checkbox"
+                checked={controlaInventario}
+                onChange={(e) => setControlaInventario(e.target.checked)}
+              />
+              <span>
+                <b>Controla inventario</b> - lleva existencias
+              </span>
+            </label>
+          )}
 
           {/* Control de membresías: acá se define QUÉ producto es la
               membresía y CUÁL descuenta usos de carrito, en vez de dejarlo

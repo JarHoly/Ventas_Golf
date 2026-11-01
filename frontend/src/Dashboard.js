@@ -8,6 +8,7 @@ import {
   faTruck,
   faTags,
   faBoxOpen,
+  faWarehouse,
   faMoneyBillTransfer,
   faChartPie,
   faCalendarCheck,
@@ -18,6 +19,7 @@ import { apiGet, esAdmin, esCliente, usuarioActual } from "./api";
 import PersonasSeccion from "./PersonasSeccion";
 import Categorias from "./Categorias";
 import Productos from "./Productos";
+import Inventario from "./Inventario";
 import Movimientos from "./Movimientos";
 import Informes from "./Informes";
 import ReservasStaff from "./ReservasStaff";
@@ -39,6 +41,7 @@ const MENU_PERSONAL = [
   },
   { id: "clientes", label: "Clientes", icon: faUsers },
   { id: "productos", label: "Productos", icon: faBoxOpen },
+  { id: "inventario", label: "Inventario", icon: faWarehouse },
   { id: "proveedores", label: "Proveedores", icon: faTruck },
   { id: "categorias", label: "Categorías", icon: faTags },
   { id: "reservas", label: "Reservas", icon: faCalendarCheck },
@@ -271,6 +274,11 @@ export default function Dashboard({ onLogout }) {
               singular="cliente"
               icono={faUsers}
               filtroInicial={filtroInicial}
+              /* Es el mismo campo de la base (Persona.cedula): acá el
+                 negocio lo llama "Número de Socio". La versión corta es la
+                 del <th>, que en móvil queda en una columna angosta. */
+              etiquetaDoc={{ th: "Socio", largo: "Número de Socio", bajo: "socio" }}
+              conMembresia
             />
           )}
           {seccion === "proveedores" && (
@@ -281,6 +289,7 @@ export default function Dashboard({ onLogout }) {
               singular="proveedor"
               icono={faTruck}
               filtroInicial={filtroInicial}
+              etiquetaDoc={{ th: "Cédula", largo: "Cédula", bajo: "cédula" }}
             />
           )}
           {seccion === "categorias" && (
@@ -295,6 +304,7 @@ export default function Dashboard({ onLogout }) {
               filtroInicial={filtroInicial}
             />
           )}
+          {seccion === "inventario" && <Inventario />}
           {seccion === "movimientos" && <Movimientos />}
           {seccion === "informes" && <Informes />}
           {seccion === "reservas" && <ReservasStaff />}

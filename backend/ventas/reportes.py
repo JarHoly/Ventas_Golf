@@ -33,6 +33,7 @@ from django.utils import timezone
 
 from .models import Movimiento, CierreDia, ObservacionDia, Persona, Producto
 from .informes import calcular_informe, validar_rango, solo_personal_negocio, MAX_DIAS_SERIE_DIARIA
+from .inventario import calcular_existencias, leer_dias_objetivo
 
 EMPRESA = "E Cuestas CORP AMERICA C.R. S.A."
 
@@ -1392,4 +1393,257 @@ def pdf_rango_movimientos(request):
     buffer.seek(0)
     respuesta = HttpResponse(buffer.read(), content_type="application/pdf")
     respuesta["Content-Disposition"] = f'inline; filename="Movimientos_{desde}_{hasta}.pdf"'
+    return respuesta
+
+
+# ======================================================================
+# PDF "EXISTENCIAS Y ROTACIÓN DE INVENTARIO"
+# El mismo cálculo que la pantalla (ventas/inventario.py): pantalla y papel
+# nunca pueden discrepar, así que ninguno de los dos recalcula nada aparte.
+# ======================================================================
+def _num(valor, vacio="-"):
+    """Entero/decimal -> texto para la tabla; None -> '-' (no aplica)."""
+    if valor is None:
+        return vacio
+    if isinstance(valor, float) and not valor.is_integer():
+        return f"{valor:,.2f}".rstrip("0").rstrip(".")
+    return f"{int(valor):,}"
+
+
+def _dias(valor, decimales=0):
+    """12.0 -> '12 d' · None -> '-' (no se puede estimar sin ventas)."""
+    if valor is None:
+        return "-"
+    return f"{valor:.{decimales}f} d"
+
+
+def _cobertura(dias):
+    """
+    Para cuántos días alcanza lo que queda. Menos de un día NO se muestra
+    como "0 d" (que se lee como "no aplica") sino como "ya": hay que reponer
+    hoy mismo.
+    """
+    if dias is None:
+        return "-"
+    return "ya" if dias < 1 else f"{dias:.0f} d"
+
+
+def _ajuste(cantidad):
+    """Ajuste neto con signo: +4 entró, -6 salió, 0 se muestra vacío."""
+    if not cantidad:
+        return "-"
+    return f"+{cantidad}" if cantidad > 0 else str(cantidad)
+
+
+@api_view(["GET"])
+def pdf_existencias(request):
+    """GET /api/inventario/existencias/pdf/?desde=&hasta=&dias_objetivo=30"""
+    error = solo_personal_negocio(request)
+    if error:
+        return error
+    rango, error = validar_rango(request)
+    if error:
+        return error
+    desde, hasta = rango
+    reporte = calcular_existencias(*rango, leer_dias_objetivo(request))
+    tot = reporte["totales"]
+    dia_desde = desde.strftime("%d/%m/%Y")
+    dia_hasta = hasta.strftime("%d/%m/%Y")
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=8 * mm, rightMargin=8 * mm,
+        topMargin=8 * mm, bottomMargin=14 * mm,
+        title=f"Existencias y rotación {reporte['desde']} a {reporte['hasta']}",
+    )
+    W = doc.width
+    elementos = []
+
+    # ============ ENCABEZADO (mismo banner que el informe) ============
+    titulo_textos = Table(
+        [[_p("EXISTENCIAS", 12, colors.white, negrita=True, leading=13)],
+         [_p("Y ROTACIÓN", 15, AZUL_CLARO, negrita=True, leading=16)]],
+        colWidths=[W * 0.40 - 44],
+    )
+    titulo_textos.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+    ]))
+    banner = Table([[_icono_titulo(), titulo_textos]], colWidths=[40, W * 0.40 - 40])
+    banner.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+        ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (0, 0), 8),
+    ]))
+
+    bloque_empresa = Table(
+        [[_p(EMPRESA, 12, NAVY, negrita=True)],
+         [_p("Cantidades en unidades de producto (no son montos)", 8, GRIS, italica=True)]],
+        colWidths=[W * 0.36],
+    )
+    bloque_empresa.setStyle(TableStyle([("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
+
+    bloque_periodo = Table(
+        [[_p("PERÍODO ANALIZADO:", 8, NAVY, negrita=True, alin=2)],
+         [_p(f"{dia_desde}  –  {dia_hasta}", 12, NAVY, negrita=True, alin=2)]],
+        colWidths=[W * 0.24],
+    )
+    bloque_periodo.setStyle(TableStyle([("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
+
+    encabezado = Table(
+        [[banner, bloque_empresa, bloque_periodo]],
+        colWidths=[W * 0.40, W * 0.36, W * 0.24],
+    )
+    encabezado.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (0, 0), 0),
+        ("RIGHTPADDING", (-1, 0), (-1, 0), 0),
+    ]))
+    elementos.append(encabezado)
+    elementos.append(Spacer(1, 4 * mm))
+
+    # ============ TARJETAS ============
+    ancho_tarjeta = W / 4 - 6
+    fila_tarjetas = Table(
+        [[
+            _tarjeta(ancho_tarjeta, "EXISTENCIA TOTAL", _num(tot["existencia"]),
+                     f"{tot['productos']} productos con control", NAVY, "#"),
+            _tarjeta(ancho_tarjeta, "UNIDADES VENDIDAS", _num(tot["ventas"]),
+                     f"en {reporte['dias']} dias", VERDE, "+"),
+            _tarjeta(ancho_tarjeta, "SIN EXISTENCIA", _num(tot["sin_existencia"]),
+                     "productos agotados", ROJO, "!"),
+            _tarjeta(ancho_tarjeta, "POR REPONER", _num(tot["por_reponer"]),
+                     f"para cubrir {reporte['dias_objetivo']} dias", MORADO, "*"),
+        ]],
+        colWidths=[W / 4] * 4,
+    )
+    fila_tarjetas.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-2, -1), 6),
+        ("RIGHTPADDING", (-1, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    elementos.append(fila_tarjetas)
+    elementos.append(Spacer(1, 4 * mm))
+
+    # ============ TABLA DETALLE ============
+    banda = Table(
+        [[_p("ROTACIÓN DE INVENTARIO POR PRODUCTO", 9, colors.white, negrita=True, alin=1)]],
+        colWidths=[W],
+    )
+    banda.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    elementos.append(banda)
+
+    # Mismo orden y mismos nombres que la pantalla: la existencia de hoy
+    # primero, después cómo se llegó a ella, y al final qué hacer.
+    datos = [[
+        "Producto", "Categoría", "Existencia\nhoy", "Había\nantes", "Entró",
+        "Se\nvendió", "Ajustes", "Venta\npor día", "Rotación",
+        "Alcanza\npara", f"Comprar\n({reporte['dias_objetivo']} d)",
+    ]]
+    estilos_filas = []
+    for idx, fila in enumerate(reporte["productos"], start=1):
+        rotacion = fila["rotacion"]
+        datos.append([
+            _p(escape(fila["producto"]), 7.5, leading=9),
+            _p(escape(fila["categoria"]), 7.5, GRIS, leading=9),
+            _num(fila["existencia"]),
+            _num(fila["existencia_inicial"]),
+            _num(fila["compras"]) if fila["compras"] else "-",
+            _num(fila["ventas"]) if fila["ventas"] else "-",
+            _ajuste(fila["ajustes"]),
+            _num(fila["promedio_diario"]),
+            f"{rotacion:.2f}x" if rotacion is not None else "-",
+            _cobertura(fila["dias_cobertura"]),
+            _num(fila["sugerido_comprar"]) if fila["sugerido_comprar"] else "-",
+        ])
+        # Lo que está agotado o a punto de agotarse se pinta en rojo: es lo
+        # único de esta tabla que exige una decisión hoy.
+        if fila["alerta"]:
+            estilos_filas.append(("TEXTCOLOR", (2, idx), (2, idx), ROJO))
+            estilos_filas.append(("FONTNAME", (2, idx), (2, idx), F_NEGRITA))
+        if fila["sugerido_comprar"]:
+            estilos_filas.append(("TEXTCOLOR", (10, idx), (10, idx), MORADO))
+            estilos_filas.append(("FONTNAME", (10, idx), (10, idx), F_NEGRITA))
+
+    if not reporte["productos"]:
+        datos.append([
+            _p("Ningún producto tiene el control de inventario activado. "
+               "Activalo en la ficha del producto para verlo acá.", 8, GRIS, italica=True),
+            *[""] * 10,
+        ])
+        estilos_filas.append(("SPAN", (0, 1), (-1, 1)))
+
+    # Promedios, rotación y cobertura NO se suman: un total de "días de
+    # cobertura" no significa nada, así que esas columnas van vacías.
+    datos.append([
+        "TOTALES", "", _num(tot["existencia"]), _num(tot["existencia_inicial"]),
+        _num(tot["compras"]), _num(tot["ventas"]), _ajuste(tot["ajustes"]),
+        "", "", "", "",
+    ])
+
+    fila_total = len(datos) - 1
+    anchos = (0.20, 0.12, 0.08, 0.07, 0.06, 0.065, 0.065, 0.075, 0.08, 0.08, 0.085)
+    tabla = Table(datos, colWidths=[W * a for a in anchos], repeatRows=1)
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, -1), F_NORMAL),
+        ("FONTNAME", (0, 0), (-1, 0), F_NEGRITA),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+        ("GRID", (0, 0), (-1, -1), 0.4, BORDE),
+        ("ROWBACKGROUNDS", (0, 1), (-1, fila_total - 1), [colors.white, ZEBRA]),
+        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5),
+        ("BACKGROUND", (0, fila_total), (-1, fila_total), NAVY),
+        ("TEXTCOLOR", (0, fila_total), (-1, fila_total), colors.white),
+        ("FONTNAME", (0, fila_total), (-1, fila_total), F_NEGRITA),
+        ("SPAN", (0, fila_total), (1, fila_total)),
+        ("ALIGN", (0, fila_total), (0, fila_total), "LEFT"),
+        *estilos_filas,
+    ]))
+    elementos.append(tabla)
+
+    # ============ CÓMO LEER EL REPORTE ============
+    # Va impreso a propósito: el PDF se imprime y se comenta en reunión, sin
+    # nadie al lado para explicar qué significa "rotación 2.4x".
+    elementos.append(Spacer(1, 3 * mm))
+    elementos.append(_p(
+        "<b>Existencia hoy</b> = había antes + entró - se vendió + ajustes. "
+        "Lo que <b>entró</b> son las compras al proveedor (movimientos de Gasto) y "
+        "los <b>ajustes</b> es lo que entró o salió sin pasar por caja (inventario "
+        "inicial, mermas, conteos). "
+        "<b>Venta por día</b> = unidades vendidas entre los días del período. "
+        "<b>Rotación</b> = cuántas veces se vendió el inventario completo en el "
+        "período (arriba de 1x se mueve; abajo de 0.5x es plata detenida). "
+        "<b>Alcanza para</b> = a ese ritmo, cuántos días dura lo que queda, que es "
+        "también cada cuánto hay que reponer. "
+        f"<b>Comprar</b> = unidades a pedir para cubrir {reporte['dias_objetivo']} días.",
+        7.5, GRIS, italica=True, leading=10,
+    ))
+    elementos.append(Spacer(1, 1.5 * mm))
+    elementos.append(_p(
+        f"Período del {dia_desde} al {dia_hasta} ({reporte['dias']} días) · "
+        f"{tot['productos']} productos con control de inventario",
+        7.5, GRIS, italica=True, alin=1,
+    ))
+
+    doc.build(elementos, canvasmaker=_CanvasNumerado)
+    buffer.seek(0)
+    respuesta = HttpResponse(buffer.read(), content_type="application/pdf")
+    nombre = f"Existencias_{reporte['desde']}_{reporte['hasta']}.pdf"
+    respuesta["Content-Disposition"] = f'inline; filename="{nombre}"'
     return respuesta

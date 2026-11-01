@@ -11,9 +11,18 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .membresias import recalcular_membresia, recalcular_por_producto
-from .models import Persona, Categoria, Producto, Movimiento, CierreDia, ObservacionDia
+from .models import (
+    AjusteInventario,
+    Persona,
+    Categoria,
+    Producto,
+    Movimiento,
+    CierreDia,
+    ObservacionDia,
+)
 from .permisos import es_admin
 from .serializers import (
+    AjusteInventarioSerializer,
     PersonaSerializer,
     CategoriaSerializer,
     ProductoSerializer,
@@ -76,7 +85,9 @@ class PersonaViewSet(BorradoProtegidoMixin, viewsets.ModelViewSet):
     serializer_class = PersonaSerializer
 
     def get_queryset(self):
-        qs = Persona.objects.all()
+        # select_related sobre la membresía (y su producto) evita una consulta
+        # por fila: la tabla de clientes muestra el vencimiento de cada uno.
+        qs = Persona.objects.select_related("membresia", "membresia__producto").all()
         tipo = self.request.query_params.get("tipo")
         if tipo:
             qs = qs.filter(tipo=tipo)
@@ -110,6 +121,38 @@ class ProductoViewSet(BorradoProtegidoMixin, viewsets.ModelViewSet):
         despues = (producto.rol_especial, producto.dias_vigencia, producto.usos_carrito)
         if antes != despues:
             recalcular_por_producto(producto)
+
+
+class AjusteInventarioViewSet(viewsets.ModelViewSet):
+    """
+    Entradas y salidas de inventario que NO son una compra ni una venta:
+    inventario inicial, mermas, sobrantes y diferencias de conteo físico.
+    Las compras y ventas ya ajustan la existencia por su cuenta — acá no se
+    registran, se registran como movimientos del día.
+
+      GET /api/ajustes-inventario/                      -> últimos ajustes
+      GET /api/ajustes-inventario/?producto=3           -> de un producto
+      GET /api/ajustes-inventario/?desde=...&hasta=...  -> de un rango
+    """
+    serializer_class = AjusteInventarioSerializer
+
+    def get_queryset(self):
+        qs = AjusteInventario.objects.select_related("producto", "registrado_por").all()
+        producto = self.request.query_params.get("producto")
+        desde = self.request.query_params.get("desde")
+        hasta = self.request.query_params.get("hasta")
+        if producto:
+            qs = qs.filter(producto=producto)
+        if desde:
+            qs = qs.filter(fecha__gte=desde)
+        if hasta:
+            qs = qs.filter(fecha__lte=hasta)
+        return qs
+
+    def perform_create(self, serializer):
+        # Quién lo registró: un ajuste cambia las existencias sin que haya
+        # plata de por medio, así que el rastro importa más que nunca.
+        serializer.save(registrado_por=self.request.user)
 
 
 class MovimientoViewSet(viewsets.ModelViewSet):

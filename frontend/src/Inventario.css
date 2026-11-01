@@ -1,0 +1,114 @@
+/* ============================================================
+   Módulo de Inventario: existencias, rotación y ajustes.
+   Reutiliza las tarjetas y los filtros de Informes.css y la
+   tabla de Crud.css; acá va solo lo propio del inventario.
+   ============================================================ */
+
+.inv-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* Tercera línea de la tarjeta (contexto del número). */
+.inf-card-sub {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.inv-barra-filtros {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.inv-barra-filtros .search-bar {
+  flex: 1 1 280px;
+  margin-bottom: 0;
+}
+
+/* La tabla tiene 13 columnas: en pantallas angostas se desliza (igual que
+   la de movimientos) en vez de aplastar los números. */
+.tabla-inv {
+  min-width: 1080px;
+}
+.tabla-inv th,
+.tabla-inv td {
+  padding: 10px 10px;
+  font-size: 13px;
+}
+
+/* Lo que exige una decisión hoy: agotado o a punto de agotarse. */
+.tabla-inv tr.fila-alerta td {
+  background: #fff8f8;
+}
+.tabla-inv tr.fila-alerta:hover td {
+  background: #fdeeee;
+}
+.inv-agotado {
+  color: #d62828;
+  font-weight: 700;
+}
+.inv-sugerido {
+  color: #7b3fa9;
+  font-weight: 700;
+}
+
+/* Cómo leer el reporte: las mismas definiciones que van impresas en el PDF. */
+.inv-leyenda {
+  margin-top: 16px;
+  background: var(--neutral);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.inv-leyenda h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--tertiary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.inv-leyenda ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+.inv-leyenda li {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.inv-leyenda li b {
+  color: var(--text);
+}
+.inv-leyenda-pie {
+  display: block;
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1100px) {
+  .inv-tarjetas {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .inv-tarjetas {
+    grid-template-columns: 1fr;
+  }
+  .inv-barra-filtros {
+    gap: 10px;
+  }
+  .page-top-acciones .page-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+}

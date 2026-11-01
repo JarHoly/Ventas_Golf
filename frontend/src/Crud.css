@@ -277,6 +277,11 @@
   max-height: 90vh;
   overflow-y: auto;
 }
+/* Formularios con campos de a dos por fila: necesitan algo más de ancho
+   para que las etiquetas no se partan en dos renglones. */
+.modal-2col {
+  max-width: 560px;
+}
 .modal-title {
   font-size: 19px;
   font-weight: 700;
@@ -384,4 +389,108 @@ select.form-input {
     width: 100%;
     justify-content: center;
   }
+}
+
+/* Marca en la tabla de Productos: cuáles llevan existencias. Se distingue
+   de .badge-rol (membresías) por el color: son dos controles distintos. */
+.badge-inv {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ede4f7;
+  color: #5c2f80;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Checkbox con etiqueta al lado (bandera de inventario, filtros). */
+.form-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.form-check input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  margin: 1px 0 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.form-check-inline {
+  margin-top: 0;
+  align-items: center;
+  white-space: nowrap;
+}
+/* El checkbox dentro de un formulario hace de campo: lleva el mismo aire
+   que un .form-label para que no se pegue al campo de abajo. */
+.form-check + .form-label {
+  margin-top: 16px;
+}
+/* Nota que ocupa el lugar de un campo escondido: necesita el mismo aire
+   arriba y abajo que tenía el campo. */
+.form-hint-solo {
+  margin: 16px 0 0;
+}
+
+/* ===== Columna de membresía en la tabla de Clientes ===== */
+/* La fecha, la marca y el botón van en UNA línea: la tabla ya se desliza
+   en horizontal, así que es preferible ensancharla a partir la celda. */
+.memb-celda {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.memb-celda .btn-icon-edit {
+  flex: 0 0 auto;
+}
+.badge-memb {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #e3f5ea;
+  color: #136b3c;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge-memb.vencida {
+  background: #fdeaea;
+  color: #a81f1f;
+}
+/* El vencimiento fijado a mano se marca SIEMPRE: una fecha que no coincide
+   con el cálculo automático tiene que explicarse en la misma fila. */
+.memb-manual {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7b3fa9;
+  border: 1px solid #ded0ee;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.memb-sin {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.celda-apagada {
+  color: var(--text-muted);
+}
+
+/* Encabezado de página sin botones al lado (los módulos con pestañas
+   ponen sus acciones debajo, junto a los filtros de cada pestaña). */
+.page-header-solo {
+  margin-bottom: 18px;
+}
+.page-top-acciones {
+  justify-content: flex-end;
+  margin-bottom: 12px;
 }

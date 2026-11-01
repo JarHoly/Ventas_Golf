@@ -1,13 +1,40 @@
+from django.utils import timezone
 from rest_framework import serializers
-from .models import Categoria, Persona, Producto, Movimiento
+from .models import AjusteInventario, Categoria, Persona, Producto, Movimiento
 
 
 class PersonaSerializer(serializers.ModelSerializer):
+    # Resumen de la membresía para pintarlo en la tabla de clientes sin
+    # pedir un endpoint por fila. Son datos de la tabla Membresia (una FK
+    # inversa 1-1), no de Persona: de ahí que sean de solo lectura.
+    membresia_vence_el = serializers.DateField(source="membresia.vence_el", read_only=True)
+    membresia_producto = serializers.CharField(source="membresia.producto.nombre", read_only=True)
+    # ¿La fecha la fijó un administrador a mano? La tabla lo marca para que
+    # nadie se sorprenda de que no coincida con el cálculo automático.
+    membresia_manual = serializers.SerializerMethodField()
+    membresia_estado = serializers.SerializerMethodField()
+
     class Meta:
         model = Persona
-        fields = ["id", "codigo", "cedula", "nombre", "telefono", "email", "tipo"]
+        fields = [
+            "id", "codigo", "cedula", "nombre", "telefono", "email", "tipo",
+            "membresia_vence_el", "membresia_producto",
+            "membresia_manual", "membresia_estado",
+        ]
         # 'codigo' se genera solo en el backend: el frontend no lo manda.
         read_only_fields = ["id", "codigo"]
+
+    def get_membresia_manual(self, persona):
+        membresia = getattr(persona, "membresia", None)
+        return membresia is not None and membresia.vence_el_manual is not None
+
+    def get_membresia_estado(self, persona):
+        """'' (no tiene) · 'Vigente' · 'Vencida'. Lo resuelve el backend para
+        que la tabla no tenga que comparar fechas en el navegador."""
+        membresia = getattr(persona, "membresia", None)
+        if membresia is None:
+            return ""
+        return "Vencida" if membresia.vence_el < timezone.localdate() else "Vigente"
 
 
 class CategoriaSerializer(serializers.ModelSerializer):
@@ -27,6 +54,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             "id", "nombre", "tipo", "uso", "precio_unitario",
             "categoria", "categoria_nombre",
             "rol_especial", "dias_vigencia", "usos_carrito",
+            "controla_inventario",
         ]
 
 
@@ -62,3 +90,47 @@ class MovimientoSerializer(serializers.ModelSerializer):
                 {"descuento": "El descuento no puede ser mayor que cantidad × precio."}
             )
         return datos
+
+
+class AjusteInventarioSerializer(serializers.ModelSerializer):
+    producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
+    # Cuánto suma o resta a la existencia (lo decide el tipo, no el usuario).
+    efecto = serializers.IntegerField(read_only=True)
+    registrado_por_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AjusteInventario
+        fields = [
+            "id", "producto", "producto_nombre", "fecha", "tipo",
+            "cantidad", "efecto", "motivo",
+            "registrado_por_nombre", "creado_en",
+        ]
+        read_only_fields = ["id", "creado_en"]
+
+    def get_registrado_por_nombre(self, ajuste):
+        quien = ajuste.registrado_por
+        return (quien.get_full_name() or quien.username) if quien else None
+
+    def validate_cantidad(self, cantidad):
+        if cantidad <= 0:
+            raise serializers.ValidationError(
+                "La cantidad debe ser mayor que cero: el signo lo pone el tipo de ajuste."
+            )
+        return cantidad
+
+    def validate_motivo(self, motivo):
+        if not motivo.strip():
+            raise serializers.ValidationError(
+                "Escribí el motivo del ajuste: queda registrado para auditoría."
+            )
+        return motivo.strip()
+
+    def validate_producto(self, producto):
+        """Un ajuste sobre un producto que no lleva existencias no significa
+        nada (y no aparecería en ningún reporte): se rechaza de entrada."""
+        if not producto.controla_inventario:
+            raise serializers.ValidationError(
+                f'"{producto.nombre}" no controla inventario. Activá esa opción '
+                f"en el producto si querés llevarle existencias."
+            )
+        return producto

@@ -14,6 +14,7 @@ import {
   faFlagCheckered,
   faNoteSticky,
   faBoxOpen,
+  faBoxesStacked,
   faCircleInfo,
   faTriangleExclamation,
 } from "@fortawesome/free-solid-svg-icons";
@@ -857,6 +858,49 @@ function AvisoCarrito({ estado, cantidad }) {
   );
 }
 
+// ¿Este producto se puede usar en un movimiento de este tipo?
+// Un producto de venta que lleva inventario también sirve para un GASTO:
+// así se registra la compra de mercadería (y así suma a las existencias).
+function productoAplica(producto, tipo) {
+  if (tipo === "Gasto") {
+    return producto.uso === "Gasto" || producto.controla_inventario;
+  }
+  return producto.uso === "Venta";
+}
+
+// ===== Aviso de la membresía del cliente al registrar un movimiento =====
+// Sale para CUALQUIER venta a un cliente con membresía (no solo carritos):
+// el operativo ve de una el vencimiento mientras registra el día.
+function AvisoMembresia({ estado }) {
+  const dia = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
+  if (!estado?.tiene_membresia) return null;
+  return (
+    <div className={"aviso-carrito " + (estado.vencida ? "alerta" : "neutro")}>
+      <FontAwesomeIcon icon={estado.vencida ? faTriangleExclamation : faCircleInfo} />
+      <span>
+        Tiene <b>{estado.producto_nombre}</b>:{" "}
+        {estado.vencida ? (
+          <>
+            <b>venció el {dia(estado.vence_el)}</b>.
+          </>
+        ) : (
+          <>
+            vence el <b>{dia(estado.vence_el)}</b>.
+          </>
+        )}
+        {estado.ajuste_manual && (
+          <>
+            {" "}
+            Fecha fijada a mano
+            {estado.ajustada_por ? ` por ${estado.ajustada_por}` : ""}
+            {estado.ajuste_motivo ? `: "${estado.ajuste_motivo}"` : ""}.
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
 // ===== Modal de agregar/editar movimiento =====
 // En modo agregar es "pegajoso": guarda y queda abierto para el siguiente.
 function MovimientoForm({
@@ -874,21 +918,31 @@ function MovimientoForm({
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
-  // El modal solo ofrece los productos del tipo de movimiento elegido:
-  // Venta -> productos de venta, Gasto -> productos de gasto.
+  // Qué productos ofrece el modal según el tipo de movimiento:
+  //  - Venta  -> los productos de venta.
+  //  - Gasto  -> los productos de gasto Y TAMBIÉN los que llevan inventario,
+  //    porque comprarle mercadería al proveedor es un gasto del mismo
+  //    producto que después se vende (es así como entra al inventario).
   const opcionesProductoFiltradas = productos
-    .filter((p) => p.uso === tipo)
-    .map((p) => ({ id: p.id, label: `${p.nombre} — $${fmt(p.precio_unitario)}` }));
+    .filter((p) => productoAplica(p, tipo))
+    .map((p) => ({
+      id: p.id,
+      label:
+        `${p.nombre} - $${fmt(p.precio_unitario)}` +
+        (tipo === "Gasto" && p.controla_inventario ? " · inventario" : ""),
+    }));
 
-  // ===== Aviso de usos de carrito (membresías) =====
-  // Solo aplica al vender un producto marcado como "Carrito": ahí el
-  // operativo necesita saber si al cliente le quedan usos o ya se pasó.
+  // ===== Membresía del cliente =====
+  // Se consulta en CUALQUIER venta a una persona (no solo al alquilar un
+  // carrito): el vencimiento se muestra mientras se registra el movimiento.
+  // Si además el producto es un "Carrito", el aviso pasa a ser el de usos.
   const productoElegido = productos.find((p) => String(p.id) === String(producto));
   const esCarrito = productoElegido?.rol_especial === "Carrito" && tipo === "Venta";
+  const esCompraInventario = productoElegido?.controla_inventario && tipo === "Gasto";
   const [membresia, setMembresia] = useState(null);
 
   useEffect(() => {
-    if (!esCarrito || !persona) {
+    if (tipo !== "Venta" || !persona) {
       setMembresia(null);
       return;
     }
@@ -907,7 +961,7 @@ function MovimientoForm({
     return () => {
       cancelado = true;
     };
-  }, [esCarrito, persona, fecha, existente?.id]);
+  }, [tipo, persona, fecha, existente?.id]);
 
   // El modal solo ofrece las personas que corresponden al tipo de movimiento:
   // Gasto -> proveedores, Venta -> clientes y socios.
@@ -919,7 +973,7 @@ function MovimientoForm({
   function cambiarTipo(nuevo) {
     setTipo(nuevo);
     const p = productos.find((x) => String(x.id) === String(producto));
-    if (p && p.uso !== nuevo) {
+    if (p && !productoAplica(p, nuevo)) {
       setProducto("");
       setPrecio("");
     }
@@ -1037,7 +1091,23 @@ function MovimientoForm({
             placeholder="Escribí el producto para buscar..."
           />
 
-          {esCarrito && <AvisoCarrito estado={membresia} cantidad={cantidad} />}
+          {/* Con un carrito manda el aviso de usos (incluye el vencimiento);
+              en cualquier otra venta, el vencimiento solo. */}
+          {esCarrito ? (
+            <AvisoCarrito estado={membresia} cantidad={cantidad} />
+          ) : (
+            <AvisoMembresia estado={membresia} />
+          )}
+
+          {esCompraInventario && (
+            <div className="aviso-carrito ok">
+              <FontAwesomeIcon icon={faBoxesStacked} />
+              <span>
+                Esta compra <b>suma {Number(cantidad) || 0} unidades</b> al
+                inventario de {productoElegido.nombre}.
+              </span>
+            </div>
+          )}
 
           <label className="form-label">Moneda</label>
           <select className="form-input" value={moneda} onChange={(e) => setMoneda(e.target.value)}>

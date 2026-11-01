@@ -37,11 +37,13 @@ export function useOrden(campoInicial = null) {
 }
 
 // Encabezado <th> clicable con la flechita de orden actual.
-export function ThOrden({ campo, orden, onClick, children }) {
+// 'ayuda' sale como tooltip: en tablas con columnas técnicas (rotación,
+// cobertura) el nombre corto no alcanza para saber qué se está mirando.
+export function ThOrden({ campo, orden, onClick, children, ayuda }) {
   const activo = orden.campo === campo;
   const icono = activo ? (orden.dir === "asc" ? faSortUp : faSortDown) : faSort;
   return (
-    <th className="th-ordenable" onClick={() => onClick(campo)}>
+    <th className="th-ordenable" onClick={() => onClick(campo)} title={ayuda}>
       {children}
       <FontAwesomeIcon icon={icono} className={"th-orden-icono" + (activo ? " activo" : "")} />
     </th>

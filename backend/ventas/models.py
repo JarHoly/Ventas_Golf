@@ -96,6 +96,11 @@ class Producto(models.Model):
     dias_vigencia = models.PositiveIntegerField(default=365)
     # Usos de carrito incluidos en cada período de la membresía.
     usos_carrito = models.PositiveIntegerField(default=50)
+    # ¿Este producto lleva control de existencias? Las clases, los servicios
+    # y las membresías NO (no hay nada físico que contar), pero las bolas o
+    # los guantes SÍ. Solo los productos marcados acá aparecen en Inventario,
+    # y solo ellos suman al comprarlos y restan al venderlos.
+    controla_inventario = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["nombre"]
@@ -211,6 +216,26 @@ class Membresia(models.Model):
     usos_incluidos = models.PositiveIntegerField()
     actualizada_en = models.DateTimeField(auto_now=True)
 
+    # ----- CASO ESPECIAL: vencimiento fijado a mano por un administrador -----
+    # Es la ÚNICA excepción a "todo se calcula desde los movimientos", y por
+    # eso exige motivo y queda auditada. Los campos de abajo NO los toca el
+    # recálculo: sobreviven a cualquier corrección de movimientos.
+    #
+    # Cómo manda sobre el cálculo (ver membresias.py): la fecha manual pasa a
+    # ser la BASE del período. Si después el cliente renueva, los días de la
+    # renovación se suman SOBRE esa fecha manual — no se pierde el ajuste.
+    vence_el_manual = models.DateField(null=True, blank=True)
+    # Por qué se cambió. Obligatorio al fijar la fecha (lo valida la vista).
+    ajuste_motivo = models.TextField(blank=True)
+    ajustada_en = models.DateTimeField(null=True, blank=True)
+    ajustada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="membresias_ajustadas",
+    )
+
     class Meta:
         ordering = ["-vence_el"]
 
@@ -290,3 +315,62 @@ class CierreDia(models.Model):
 
     def __str__(self):
         return f"Cierre {self.fecha}"
+
+
+class AjusteInventario(models.Model):
+    """
+    ENTRADAS Y SALIDAS DE INVENTARIO QUE NO SON UNA COMPRA NI UNA VENTA.
+
+    La existencia de un producto se calcula así (ver ventas/inventario.py):
+
+        existencia = ajustes  +  compras (Gastos)  −  ventas
+
+    Las compras y las ventas ya viven en Movimiento, así que esta tabla cubre
+    SOLO lo que no pasa por caja:
+
+    - Inventario inicial: lo que ya había en bodega el día que se empezó a
+      usar el sistema (sin esto el stock arrancaría en cero).
+    - Entrada: sobrantes, devoluciones de un cliente, un conteo que dio de más.
+    - Salida: mermas, roturas, consumo interno, un conteo que dio de menos.
+
+    Un conteo físico se registra como la Entrada o la Salida de la DIFERENCIA
+    contra lo que el sistema creía tener (el formulario calcula ese número).
+    """
+
+    class Tipo(models.TextChoices):
+        INICIAL = "Inicial", "Inventario inicial"
+        ENTRADA = "Entrada", "Entrada (sobrante, devolución)"
+        SALIDA = "Salida", "Salida (merma, rotura, consumo)"
+
+    # Solo tiene sentido para productos con controla_inventario=True (lo
+    # valida el serializer: el resto no lleva existencias).
+    producto = models.ForeignKey(
+        Producto, on_delete=models.PROTECT, related_name="ajustes_inventario"
+    )
+    fecha = models.DateField()
+    tipo = models.CharField(max_length=10, choices=Tipo.choices, default=Tipo.ENTRADA)
+    # Siempre POSITIVA: el signo lo da el tipo (ver 'efecto'). Guardar un
+    # número con signo invitaba a inconsistencias del estilo "Salida de +5".
+    cantidad = models.PositiveIntegerField()
+    # Por qué se ajustó. Obligatorio (lo valida el serializer): un ajuste sin
+    # explicación es imposible de auditar después.
+    motivo = models.CharField(max_length=200)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    registrado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ajustes_inventario",
+    )
+
+    class Meta:
+        ordering = ["-fecha", "-id"]
+
+    def __str__(self):
+        return f"{self.fecha} · {self.tipo} {self.cantidad} · {self.producto.nombre}"
+
+    @property
+    def efecto(self):
+        """Cuánto suma (o resta) este ajuste a la existencia."""
+        return -self.cantidad if self.tipo == self.Tipo.SALIDA else self.cantidad
